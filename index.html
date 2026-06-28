@@ -1,76 +1,54 @@
-<!DOCTYPE html>
-<html lang="en" class="dark">
+<!doctype html>
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SYSTEMMAG | Digital Shift</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              industrial: {
-                black: '#050505',
-                dark: '#0A0A0A',
-                gray: '#1F1F1F',
-                accent: '#3B82F6', // Tech Blue
-                alert: '#EF4444', // Danger Red
-                metallic: '#94A3B8',
-              }
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            },
-            backgroundImage: {
-              'grid-pattern': "linear-gradient(to right, #1f1f1f 1px, transparent 1px), linear-gradient(to bottom, #1f1f1f 1px, transparent 1px)",
-            }
-          }
-        }
+    <title>SYSTEMMAG® — La fermeture magnétique conçue pour disparaître</title>
+    <meta
+      name="description"
+      content="Technologie de fermeture magnétique invisible pour textiles, accessoires et équipements techniques. Intégration B2B, formats produits et savoir-faire."
+    />
+    <meta
+      name="keywords"
+      content="SYSTEMMAG, fermeture magnétique, fermeture magnétique textile, zips magnétiques, bandes aimantées, fourreaux"
+    />
+    <meta property="og:title" content="SYSTEMMAG® — La fermeture magnétique conçue pour disparaître" />
+    <meta
+      property="og:description"
+      content="Fermetures magnétiques intégrées aux textiles, accessoires et équipements techniques."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/images/cinematic-hero-mockup-v3.png" />
+    <link rel="preload" as="image" href="/images/logo-systemmag.png" />
+    <link rel="preload" as="image" href="/images/cinematic-hero-mockup-v3.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "SYSTEMMAG",
+        "url": "https://systemmag.vercel.app/fr",
+        "logo": "/images/logo-systemmag.png",
+        "email": "contact@systemmag.com",
+        "telephone": "+33 1 45 08 91 41",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "20 rue Bouvier",
+          "postalCode": "75011",
+          "addressLocality": "Paris",
+          "addressCountry": "FR"
+        },
+        "description": "Technologie de fermeture magnétique invisible pour textiles, accessoires et équipements techniques."
       }
     </script>
-    <style>
-      body {
-        background-color: #050505;
-        color: #ffffff;
-        overflow-x: hidden;
-      }
-      /* Custom Scrollbar for Industrial Feel */
-      ::-webkit-scrollbar {
-        width: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #050505; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #333; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #555; 
-      }
-      .industrial-grid {
-        background-size: 40px 40px;
-        mask-image: linear-gradient(to bottom, transparent, 10%, black, 90%, transparent);
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0"
-  }
-}
-</script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

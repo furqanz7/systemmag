@@ -1,0 +1,72 @@
+{
+  "rewrites": [
+    {
+      "source": "/produits/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/products/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/marches/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/markets/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/fr/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/en/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/technology",
+      "destination": "/"
+    },
+    {
+      "source": "/products",
+      "destination": "/"
+    },
+    {
+      "source": "/markets",
+      "destination": "/"
+    },
+    {
+      "source": "/integration",
+      "destination": "/"
+    },
+    {
+      "source": "/about",
+      "destination": "/"
+    },
+    {
+      "source": "/contact",
+      "destination": "/"
+    },
+    {
+      "source": "/echantillon",
+      "destination": "/"
+    },
+    {
+      "source": "/blog/:path*",
+      "destination": "/"
+    },
+    {
+      "source": "/press",
+      "destination": "/"
+    },
+    {
+      "source": "/legal",
+      "destination": "/"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/"
+    }
+  ]
+}
