@@ -2,16 +2,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   ArrowUpRight,
+  Box,
   Check,
   ChevronDown,
   ChevronLeft,
+  Clock3,
   Download,
+  Factory,
   FileText,
+  Layers3,
+  Magnet,
   Mail,
   MapPin,
   Menu,
   Phone,
+  Ruler,
   Search,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -32,7 +39,6 @@ import {
   TECHNOLOGY_CAPABILITIES,
   TECHNOLOGY_COMPARISON,
   TECHNOLOGY_STEPS,
-  TRUST_BADGES,
 } from './constants';
 import type { BlogPost, LegalPage, Market, ProductFamily } from './types';
 
@@ -60,6 +66,53 @@ const CONTACT_ITEMS = [
   { icon: MapPin, label: '20 rue Bouvier, 75011 Paris' },
   { icon: Phone, label: '+33 1 45 08 91 41' },
   { icon: Mail, label: 'contact@systemmag.com' },
+];
+
+const HERO_SPECS = [
+  { label: 'Familles', value: 'Zip, bande, fourreau' },
+  { label: 'Formats', value: 'BA-V04 à BA-V12' },
+  { label: 'Sortie', value: 'prototype ou série' },
+];
+
+const PROOF_ITEMS = [
+  {
+    icon: Magnet,
+    label: 'Maintien réparti',
+    value: 'La force est construite sur une ligne magnétique, pas sur un point isolé.',
+  },
+  {
+    icon: Ruler,
+    label: 'Architecture définie',
+    value: 'Format, rangs, polarités, couture et finition sont cadrés ensemble.',
+  },
+  {
+    icon: ShieldCheck,
+    label: 'Usage exigeant',
+    value: 'Pensé pour les produits manipulés vite, sous contrainte ou avec précision limitée.',
+  },
+  {
+    icon: Factory,
+    label: 'Passage en série',
+    value: 'Le prototype sert à stabiliser le geste avant production.',
+  },
+];
+
+const BUYER_PATHS = [
+  {
+    icon: Box,
+    title: 'Choisir une famille',
+    text: 'Identifier si le besoin relève d’une fermeture linéaire, d’un maintien réparti, d’un fourreau ou d’un développement spécifique.',
+  },
+  {
+    icon: Layers3,
+    title: 'Qualifier le support',
+    text: 'Épaisseur, tension, courbure, lavage, couture et finition déterminent la bonne architecture magnétique.',
+  },
+  {
+    icon: Clock3,
+    title: 'Valider le geste',
+    text: 'La solution est jugée sur la perception réelle : alignement, tenue, ouverture, bruit et répétition.',
+  },
 ];
 
 const LANG_PREFIX = '/fr';
@@ -502,6 +555,7 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
     <>
       <section className="home-hero">
         <div className="hero-copy reveal">
+          <span className="version-mark">[ v.01b ]</span>
           <h1>
             La fermeture magnétique conçue pour <span>disparaître.</span>
           </h1>
@@ -523,6 +577,15 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
           <figure className="hero-media parallax-media">
             <img src="/images/cinematic-hero-mockup-v3.png" alt="Détail textile d’une fermeture magnétique Systemmag" />
           </figure>
+          <div className="hero-spec-card">
+            <span>Architecture produit</span>
+            {HERO_SPECS.map((item) => (
+              <div key={item.label}>
+                <small>{item.label}</small>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
           <div className="hero-annotation top">Ruban textile technique</div>
           <div className="hero-annotation bottom">Architecture magnétique intégrée</div>
         </div>
@@ -570,6 +633,10 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
           <div>
             <p className="section-label">Produits</p>
             <h2>Familles produits pour composer votre fermeture.</h2>
+            <p className="section-deck">
+              Un catalogue court, lisible par les équipes produit, R&D et production : le composant est toujours relié
+              au geste et au mode d’intégration.
+            </p>
           </div>
           <button className="secondary-action dark" onClick={() => navigate('/produits')}>
             Tous les produits <ArrowRight size={17} />
@@ -626,14 +693,27 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
       </section>
 
       <section className="section architecture-section">
-        <div className="section-head reveal">
+        <div className="architecture-panel reveal">
           <div>
-            <p className="section-label">Architecture</p>
+            <p className="section-label light">Architecture</p>
             <h2>Un choix de fermeture commence par la contrainte d’usage.</h2>
+            <p>
+              La bonne réponse n’est pas seulement un format d’aimant. C’est un équilibre entre support, force,
+              finition, manipulation et industrialisation.
+            </p>
           </div>
-          <button className="text-link" onClick={() => navigate('/integration')}>
+          <button className="secondary-action inverted" onClick={() => navigate('/integration')}>
             Parler intégration <ArrowRight size={16} />
           </button>
+        </div>
+        <div className="buyer-path-grid">
+          {BUYER_PATHS.map(({ icon: Icon, title, text }) => (
+            <article key={title} className="buyer-path reveal">
+              <Icon size={22} />
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
         </div>
         <div className="decision-grid">
           {PRODUCT_DECISION_PATHS.map((path, index) => (
@@ -655,12 +735,17 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
 };
 
 const TrustStrip: React.FC = () => (
-  <section className="trust-strip reveal">
-    {TRUST_BADGES.map((badge) => (
-      <div key={badge.label}>
-        <strong>{badge.label}</strong>
-        <span>{badge.value}</span>
-      </div>
+  <section className="trust-strip">
+    <div className="trust-lead">
+      <span>Engineered performance</span>
+      <strong>Preuve technique avant effet visuel.</strong>
+    </div>
+    {PROOF_ITEMS.map(({ icon: Icon, label, value }) => (
+      <article key={label}>
+        <Icon size={27} />
+        <strong>{label}</strong>
+        <span>{value}</span>
+      </article>
     ))}
   </section>
 );
@@ -843,6 +928,11 @@ const ProductPage: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = 
               Demander un échantillon
             </button>
           </div>
+          <div className="product-hero-specs">
+            {product.specs.map((spec) => (
+              <span key={spec}>{spec}</span>
+            ))}
+          </div>
         </div>
 
         <div className="product-gallery reveal">
@@ -850,8 +940,8 @@ const ProductPage: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = 
             <img src={activeImage} alt={product.title} />
           </figure>
           <div className="gallery-thumbs">
-            {galleryImages.slice(0, 5).map((image) => (
-              <button key={image} className={image === activeImage ? 'active' : ''} onClick={() => setActiveImage(image)}>
+            {galleryImages.slice(0, 5).map((image, index) => (
+              <button key={`${product.id}-${index}-${image}`} className={image === activeImage ? 'active' : ''} onClick={() => setActiveImage(image)}>
                 <img src={image} alt="" />
               </button>
             ))}
