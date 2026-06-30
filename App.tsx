@@ -404,6 +404,8 @@ const useScrollSystems = (route: AppRoute, locale: Locale) => {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return undefined;
 
+    let media: ReturnType<typeof gsap.matchMedia> | undefined;
+
     const context = gsap.context(() => {
       gsap.utils.toArray<HTMLElement>('.reveal').forEach((element) => {
         if (element.closest('.home-hero, .page-intro, .product-detail-hero, .market-detail-hero, .contact-page')) {
@@ -443,10 +445,147 @@ const useScrollSystems = (route: AppRoute, locale: Locale) => {
           },
         );
       });
+
+      media = gsap.matchMedia();
+
+      media.add('(min-width: 1241px)', () => {
+        gsap.utils.toArray<HTMLElement>('.qualification-section').forEach((section) => {
+          const scene = section.querySelector<HTMLElement>('.qualification-scene');
+          const intro = section.querySelector<HTMLElement>('.qualification-intro');
+          const progress = section.querySelector<HTMLElement>('.qualification-progress-fill');
+          const steps = Array.from(section.querySelectorAll<HTMLElement>('.qualification-step-card'));
+          const roleRail = section.querySelector<HTMLElement>('.buyer-role-rail');
+          const roleCards = Array.from(section.querySelectorAll<HTMLElement>('.buyer-role-rail article'));
+
+          if (!scene || !intro || steps.length === 0) return;
+
+          gsap.set(steps, {
+            autoAlpha: 0.28,
+            y: 32,
+            filter: 'blur(1.5px)',
+          });
+          gsap.set(steps[0], {
+            autoAlpha: 1,
+            y: 0,
+            filter: 'blur(0px)',
+          });
+          if (progress) gsap.set(progress, { scaleX: 0.18 });
+
+          const timeline = gsap.timeline({
+            defaults: { ease: 'none' },
+            scrollTrigger: {
+              trigger: section,
+              start: 'top top',
+              end: () => `+=${Math.round(window.innerHeight * 2.35)}`,
+              pin: scene,
+              pinSpacing: true,
+              scrub: 0.72,
+              anticipatePin: 1,
+              invalidateOnRefresh: true,
+            },
+          });
+
+          timeline.fromTo(
+            intro,
+            { y: 22, autoAlpha: 0.88 },
+            { y: 0, autoAlpha: 1, duration: 0.42 },
+            0,
+          );
+
+          steps.forEach((step, index) => {
+            const moment = index * 0.72;
+            timeline
+              .to(
+                steps,
+                {
+                  autoAlpha: 0.24,
+                  y: 34,
+                  filter: 'blur(1.6px)',
+                  duration: 0.28,
+                },
+                moment,
+              )
+              .to(
+                step,
+                {
+                  autoAlpha: 1,
+                  y: 0,
+                  filter: 'blur(0px)',
+                  duration: 0.45,
+                },
+                moment + 0.08,
+              );
+          });
+
+          timeline.to(
+            intro,
+            {
+              y: -18,
+              autoAlpha: 0.78,
+              duration: 0.45,
+            },
+            steps.length * 0.72,
+          );
+
+          if (progress) {
+            timeline.to(progress, { scaleX: 1, duration: steps.length * 0.72 }, 0);
+          }
+
+          if (roleRail && roleCards.length) {
+            gsap.fromTo(
+              roleCards,
+              { autoAlpha: 0, y: 38 },
+              {
+                autoAlpha: 1,
+                y: 0,
+                duration: 0.72,
+                ease: 'power3.out',
+                stagger: 0.08,
+                scrollTrigger: {
+                  trigger: roleRail,
+                  start: 'top 96%',
+                  toggleActions: 'play none none reverse',
+                },
+              },
+            );
+          }
+        });
+      });
+
+      media.add('(max-width: 1240px)', () => {
+        gsap.utils.toArray<HTMLElement>('.qualification-section').forEach((section) => {
+          const intro = section.querySelector<HTMLElement>('.qualification-intro');
+          const steps = Array.from(section.querySelectorAll<HTMLElement>('.qualification-step-card'));
+          const roleCards = Array.from(section.querySelectorAll<HTMLElement>('.buyer-role-rail article'));
+
+          const sequence = [intro, ...steps, ...roleCards].filter(Boolean) as HTMLElement[];
+          if (!sequence.length) return;
+
+          gsap.fromTo(
+            sequence,
+            { autoAlpha: 0, y: 28 },
+            {
+              autoAlpha: 1,
+              y: 0,
+              duration: 0.72,
+              ease: 'power3.out',
+              stagger: 0.08,
+              scrollTrigger: {
+                trigger: section,
+                start: 'top 76%',
+                toggleActions: 'play none none reverse',
+              },
+            },
+          );
+        });
+      });
     });
 
     ScrollTrigger.refresh();
-    return () => context.revert();
+    return () => {
+      media?.revert();
+      context.revert();
+    };
   }, [route, locale]);
 };
 
@@ -1130,29 +1269,34 @@ const QualificationSectionContent: React.FC<{ navigate: NavigateFn }> = ({ navig
 
   return (
     <section className="section qualification-section">
-      <div className="qualification-intro reveal">
-        <p className="section-label">{t('Qualification')}</p>
-        <h2>{t('Le bon choix commence par les contraintes du produit.')}</h2>
-        <p>
-          {t('Une page professionnelle doit aider l’acheteur à se situer avant le premier échange. SYSTEMMAG guide le choix entre zip, bande, fourreau ou développement spécifique en partant de critères concrets.')}
-        </p>
-        <SmartLink to="/contact" navigate={navigate} className="primary-action">
-          {t('Qualifier un projet')} <ArrowRight size={17} />
-        </SmartLink>
+      <div className="qualification-scene">
+        <div className="qualification-intro">
+          <p className="section-label">{t('Qualification')}</p>
+          <h2>{t('Le bon choix commence par les contraintes du produit.')}</h2>
+          <p>
+            {t('Une page professionnelle doit aider l’acheteur à se situer avant le premier échange. SYSTEMMAG guide le choix entre zip, bande, fourreau ou développement spécifique en partant de critères concrets.')}
+          </p>
+          <div className="qualification-progress" aria-hidden="true">
+            <span className="qualification-progress-fill" />
+          </div>
+          <SmartLink to="/contact" navigate={navigate} className="primary-action">
+            {t('Qualifier un projet')} <ArrowRight size={17} />
+          </SmartLink>
+        </div>
+
+        <div className="qualification-table" aria-label={t('Qualification')}>
+          {qualificationPoints.map((point) => (
+            <article key={point.label} className="qualification-step-card">
+              <span>{point.label}</span>
+              <strong>{point.title}</strong>
+              <p>{point.question}</p>
+              <small>{point.answer}</small>
+            </article>
+          ))}
+        </div>
       </div>
 
-      <div className="qualification-table reveal">
-        {qualificationPoints.map((point) => (
-          <article key={point.label}>
-            <span>{point.label}</span>
-            <strong>{point.title}</strong>
-            <p>{point.question}</p>
-            <small>{point.answer}</small>
-          </article>
-        ))}
-      </div>
-
-      <div className="buyer-role-rail reveal">
+      <div className="buyer-role-rail">
         {buyerRoles.map((role) => (
           <article key={role.team}>
             <span>{role.team}</span>
