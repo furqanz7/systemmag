@@ -838,7 +838,7 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
 
         <div className="hero-media-wrap reveal">
           <figure className="hero-media parallax-media">
-            <img src="/images/hero-clean-magnetic-closure.png" alt="Détail macro d’une fermeture magnétique textile Systemmag" />
+            <img src="/images/hero-integrated-markets.png" alt="Détail original d’une fermeture magnétique textile Systemmag" />
           </figure>
           <div className="hero-spec-card">
             <span>{t('Détails techniques')}</span>
