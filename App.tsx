@@ -615,16 +615,6 @@ const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }
             {copy.technology}
           </SmartLink>
           <SmartLink
-            to="/produits"
-            navigate={navigate}
-            className={route.kind === 'products' || route.kind === 'product' ? 'nav-link active' : 'nav-link'}
-            onMouseEnter={() => setMega('products')}
-            onFocus={() => setMega('products')}
-            aria-expanded={mega === 'products'}
-          >
-            {copy.products} <ChevronDown size={14} />
-          </SmartLink>
-          <SmartLink
             to="/marches"
             navigate={navigate}
             className={route.kind === 'markets' || route.kind === 'market' ? 'nav-link active' : 'nav-link'}
@@ -634,22 +624,22 @@ const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }
           >
             {copy.markets} <ChevronDown size={14} />
           </SmartLink>
+          <SmartLink
+            to="/produits"
+            navigate={navigate}
+            className={route.kind === 'products' || route.kind === 'product' ? 'nav-link active' : 'nav-link'}
+            onMouseEnter={() => setMega('products')}
+            onFocus={() => setMega('products')}
+            aria-expanded={mega === 'products'}
+          >
+            {copy.products} <ChevronDown size={14} />
+          </SmartLink>
           <SmartLink to="/integration" navigate={navigate} className={route.kind === 'integration' ? 'nav-link active' : 'nav-link'}>
             {copy.integration}
           </SmartLink>
           <a className="nav-link" href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
             {copy.catalogue}
           </a>
-          <SmartLink
-            to="/blog"
-            navigate={navigate}
-            className={route.kind === 'blog' || route.kind === 'article' ? 'nav-link active' : 'nav-link'}
-            onMouseEnter={() => setMega('resources')}
-            onFocus={() => setMega('resources')}
-            aria-expanded={mega === 'resources'}
-          >
-            {copy.resources} <ChevronDown size={14} />
-          </SmartLink>
         </nav>
 
         <div className="header-actions">
@@ -832,36 +822,47 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
         <div className="hero-copy reveal">
           <span className="version-mark">[ v.01b ]</span>
           <h1>
-            {t('La fermeture magnétique conçue pour')} <span>{t('disparaître.')}</span>
+            <span>{t('Fermeture')}</span>
+            <span className="accent">{t('magnétique')}</span>
+            <span>{t('invisible')}</span>
           </h1>
           <p>
             {t('Systèmes magnétiques intégrés aux textiles, accessoires et équipements techniques pour créer des fermetures discrètes, souples et adaptées à vos contraintes d’usage.')}
           </p>
           <div className="hero-actions">
-            <SmartLink to="/contact" navigate={navigate} className="primary-action large">
-              {t('Parler à un expert')} <ArrowRight size={18} />
+            <SmartLink to="/technology" navigate={navigate} className="hero-tech-link">
+              {t('Explorer la technologie')} <ArrowUpRight size={16} />
             </SmartLink>
-            <a className="secondary-action" href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
-              {t('Voir le catalogue')} <Download size={17} />
-            </a>
           </div>
         </div>
 
         <div className="hero-media-wrap reveal">
           <figure className="hero-media parallax-media">
-            <img src="/images/cinematic-hero-mockup-v3.png" alt="Détail textile d’une fermeture magnétique Systemmag" />
+            <img src="/images/hero-clean-magnetic-closure.png" alt="Détail macro d’une fermeture magnétique textile Systemmag" />
           </figure>
           <div className="hero-spec-card">
-            <span>{t('Architecture produit')}</span>
-            {content.heroSpecs.map((item) => (
-              <div key={item.label}>
-                <small>{item.label}</small>
-                <strong>{item.value}</strong>
-              </div>
-            ))}
+            <span>{t('Détails techniques')}</span>
+            <div>
+              <small>{t('Principe')}</small>
+              <strong>{t('Auto-positionnement')}</strong>
+            </div>
+            <div>
+              <small>{t('Familles')}</small>
+              <strong>{t('Zip, bande, fourreau')}</strong>
+            </div>
+            <div>
+              <small>{t('Intégration')}</small>
+              <strong>{t('Couture / fourreau')}</strong>
+            </div>
+            <div>
+              <small>{t('Sortie')}</small>
+              <strong>{t('prototype ou série')}</strong>
+            </div>
+            <SmartLink to="/technology" navigate={navigate}>
+              {t('Voir les détails')} <ArrowUpRight size={13} />
+            </SmartLink>
           </div>
-          <div className="hero-annotation top">{t('Ruban textile technique')}</div>
-          <div className="hero-annotation bottom">{t('Architecture magnétique intégrée')}</div>
+          <div className="hero-frame-count">[ 001 / 005 ]</div>
         </div>
       </section>
 
