@@ -592,6 +592,7 @@ const LanguageSwitch: React.FC<{ locale: Locale; navigate: NavigateFn; onChange?
 const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }> = ({ route, navigate, locale }) => {
   const [mega, setMega] = useState<'products' | 'markets' | 'resources' | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
   const copy = HEADER_COPY[locale];
 
   const closeAll = () => {
@@ -599,8 +600,46 @@ const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }
     setMobileOpen(false);
   };
 
+  useEffect(() => {
+    if (mega || mobileOpen) {
+      setHeaderHidden(false);
+      return undefined;
+    }
+
+    let lastY = window.scrollY;
+    let ticking = false;
+
+    const updateHeader = () => {
+      const currentY = window.scrollY;
+      const delta = currentY - lastY;
+
+      if (currentY < 120 || delta < -8) {
+        setHeaderHidden(false);
+      } else if (delta > 8 && currentY > 240) {
+        setHeaderHidden(true);
+      }
+
+      lastY = currentY;
+      ticking = false;
+    };
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(updateHeader);
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [mega, mobileOpen]);
+
+  useEffect(() => {
+    setHeaderHidden(false);
+  }, [route, locale]);
+
   return (
-    <header className="site-header" onMouseLeave={() => setMega(null)}>
+    <header className={headerHidden ? 'site-header is-hidden' : 'site-header'} onMouseLeave={() => setMega(null)}>
       <div className="header-bar">
         <SmartLink to="/" navigate={navigate} className="brand-lockup" onClick={closeAll}>
           <img src="/images/logo-systemmag.png" alt="SYSTEMMAG" />
