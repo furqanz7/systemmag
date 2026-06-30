@@ -620,6 +620,7 @@ const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }
             className={route.kind === 'markets' || route.kind === 'market' ? 'nav-link active' : 'nav-link'}
             onMouseEnter={() => setMega('markets')}
             onFocus={() => setMega('markets')}
+            aria-haspopup="menu"
             aria-expanded={mega === 'markets'}
           >
             {copy.markets} <ChevronDown size={14} />
@@ -630,6 +631,7 @@ const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }
             className={route.kind === 'products' || route.kind === 'product' ? 'nav-link active' : 'nav-link'}
             onMouseEnter={() => setMega('products')}
             onFocus={() => setMega('products')}
+            aria-haspopup="menu"
             aria-expanded={mega === 'products'}
           >
             {copy.products} <ChevronDown size={14} />
@@ -657,10 +659,11 @@ const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }
         {mega && (
           <motion.div
             className="mega-panel"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18 }}
+            initial={{ opacity: 0, y: -8, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.985 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            onMouseEnter={() => setMega(mega)}
           >
             {mega === 'products' && <ProductsMega navigate={navigate} close={closeAll} />}
             {mega === 'markets' && <MarketsMega navigate={navigate} close={closeAll} />}
