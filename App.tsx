@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -40,6 +40,7 @@ import {
   TECHNOLOGY_STEPS,
   TRUST_BADGES,
 } from './constants';
+import { EN_TRANSLATIONS } from './i18n';
 import type { BlogPost, LegalPage, Market, ProductFamily } from './types';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -199,6 +200,7 @@ const LANGUAGE_OPTIONS: Array<{ code: Locale; label: string; name: string }> = [
 ];
 
 const DEFAULT_LOCALE: Locale = 'fr';
+const LocaleContext = createContext<Locale>(DEFAULT_LOCALE);
 
 const stripLanguagePrefix = (path: string) => path.replace(/^\/(?:fr|en)(?=\/|$)/, '') || '/';
 
@@ -214,8 +216,83 @@ const getContentPath = (path?: string) => {
 
 const localPath = (path: string, locale: Locale = getLocaleFromPath()) => `/${locale}${path === '/' ? '' : path}`;
 
-const productPath = (product: ProductFamily) => `/produits/${product.id}`;
-const marketPath = (market: Market) => `/marches/${market.id}`;
+const pathForLocale = (path: string, locale: Locale) => {
+  const contentPath = stripLanguagePrefix(path).replace(/\/+$/, '') || '/';
+  if (contentPath === '/') return '/';
+  const segments = contentPath.split('/').filter(Boolean);
+  const first = segments[0];
+  const localizedFirst = locale === 'en'
+    ? ({ produits: 'products', marches: 'markets', 'marchés': 'markets', technologie: 'technology', ressources: 'blog', entreprise: 'about', histoire: 'about', 'savoir-faire': 'integration', echantillon: 'sample', presse: 'press' }[first] ?? first)
+    : ({ products: 'produits', markets: 'marches', technology: 'technology', resources: 'blog', company: 'about', sample: 'echantillon', press: 'press' }[first] ?? first);
+  return `/${[localizedFirst, ...segments.slice(1)].join('/')}`;
+};
+
+const productPath = (product: ProductFamily, locale: Locale = getLocaleFromPath()) => (
+  `${locale === 'en' ? '/products' : '/produits'}/${product.id}`
+);
+const marketPath = (market: Market, locale: Locale = getLocaleFromPath()) => (
+  `${locale === 'en' ? '/markets' : '/marches'}/${market.id}`
+);
+
+const translateText = (text: string, locale: Locale) => (locale === 'en' ? EN_TRANSLATIONS[text] ?? text : text);
+
+const translateDeep = <T,>(value: T, locale: Locale): T => {
+  if (locale === 'fr') return value;
+  if (typeof value === 'string') return translateText(value, locale) as T;
+  if (Array.isArray(value)) return value.map((item) => translateDeep(item, locale)) as T;
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, translateDeep(entry, locale)]),
+    ) as T;
+  }
+  return value;
+};
+
+const CONTENT_SOURCE = {
+  contactItems: CONTACT_ITEMS,
+  heroSpecs: HERO_SPECS,
+  proofItems: PROOF_ITEMS,
+  buyerRoles: BUYER_ROLES,
+  buyerPaths: BUYER_PATHS,
+  qualificationPoints: QUALIFICATION_POINTS,
+  technologySteps: TECHNOLOGY_STEPS,
+  products: PRODUCTS,
+  baFormats: BA_FORMATS,
+  markets: MARKETS,
+  processSteps: PROCESS_STEPS,
+  trustBadges: TRUST_BADGES,
+  technologyCapabilities: TECHNOLOGY_CAPABILITIES,
+  technologyComparison: TECHNOLOGY_COMPARISON,
+  productDecisionPaths: PRODUCT_DECISION_PATHS,
+  aboutTimeline: ABOUT_TIMELINE,
+  pressItems: PRESS_ITEMS,
+  blogPosts: BLOG_POSTS,
+  legalPages: LEGAL_PAGES,
+};
+
+type SystemmagContent = typeof CONTENT_SOURCE;
+
+const getLocalizedContent = (locale: Locale): SystemmagContent => translateDeep(CONTENT_SOURCE, locale);
+const useLocale = () => useContext(LocaleContext);
+const useText = () => {
+  const locale = useLocale();
+  return (text: string) => translateText(text, locale);
+};
+const useLocalizedContent = () => {
+  const locale = useLocale();
+  return useMemo(() => getLocalizedContent(locale), [locale]);
+};
+
+const resolveProductFrom = (products: ProductFamily[], id: string) => (
+  products.find((product) => product.id === id || product.aliases?.includes(id)) ?? products[0]
+);
+
+const resolveMarketFrom = (markets: Market[], id: string) => (
+  markets.find((market) => market.id === id || market.aliases?.includes(id)) ?? markets[0]
+);
+
+const resolveArticleFrom = (posts: BlogPost[], slug: string) => posts.find((post) => post.slug === slug) ?? posts[0];
+const resolveLegalPageFrom = (pages: LegalPage[], slug: string) => pages.find((page) => page.slug === slug) ?? pages[0];
 
 const parseRoute = (): AppRoute => {
   const rawPath = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -242,55 +319,46 @@ const parseRoute = (): AppRoute => {
   return { kind: 'home' };
 };
 
-const resolveProduct = (id: string) => (
-  PRODUCTS.find((product) => product.id === id || product.aliases?.includes(id)) ?? PRODUCTS[0]
-);
-
-const resolveMarket = (id: string) => (
-  MARKETS.find((market) => market.id === id || market.aliases?.includes(id)) ?? MARKETS[0]
-);
-
-const resolveArticle = (slug: string) => BLOG_POSTS.find((post) => post.slug === slug) ?? BLOG_POSTS[0];
-const resolveLegalPage = (slug: string) => LEGAL_PAGES.find((page) => page.slug === slug) ?? LEGAL_PAGES[0];
-
-const pageTitle = (route: AppRoute): string => {
-  if (route.kind === 'product') return `${resolveProduct(route.id).title} — ${APP_NAME}`;
-  if (route.kind === 'market') return `${resolveMarket(route.id).title} — ${APP_NAME}`;
-  if (route.kind === 'technology') return `Technologie — ${APP_NAME}`;
-  if (route.kind === 'products') return `Produits — ${APP_NAME}`;
-  if (route.kind === 'markets') return `Marchés — ${APP_NAME}`;
-  if (route.kind === 'integration') return `Savoir-faire — ${APP_NAME}`;
-  if (route.kind === 'blog') return `Ressources — ${APP_NAME}`;
-  if (route.kind === 'article') return `${resolveArticle(route.slug).title} — ${APP_NAME}`;
-  if (route.kind === 'contact') return `Contact — ${APP_NAME}`;
-  return `${APP_NAME} — La fermeture magnétique conçue pour disparaître`;
+const pageTitle = (route: AppRoute, locale: Locale): string => {
+  const content = getLocalizedContent(locale);
+  if (route.kind === 'product') return `${resolveProductFrom(content.products, route.id).title} — ${APP_NAME}`;
+  if (route.kind === 'market') return `${resolveMarketFrom(content.markets, route.id).title} — ${APP_NAME}`;
+  if (route.kind === 'technology') return `${translateText('Technologie', locale)} — ${APP_NAME}`;
+  if (route.kind === 'products') return `${translateText('Produits', locale)} — ${APP_NAME}`;
+  if (route.kind === 'markets') return `${translateText('Marchés', locale)} — ${APP_NAME}`;
+  if (route.kind === 'integration') return `${translateText('Savoir-faire', locale)} — ${APP_NAME}`;
+  if (route.kind === 'blog') return `${translateText('Ressources', locale)} — ${APP_NAME}`;
+  if (route.kind === 'article') return `${resolveArticleFrom(content.blogPosts, route.slug).title} — ${APP_NAME}`;
+  if (route.kind === 'contact') return `${translateText('Contact', locale)} — ${APP_NAME}`;
+  return `${APP_NAME} — ${translateText('La fermeture magnétique conçue pour disparaître', locale)}`;
 };
 
-const pageDescription = (route: AppRoute): string => {
+const pageDescription = (route: AppRoute, locale: Locale): string => {
+  const content = getLocalizedContent(locale);
   if (route.kind === 'product') {
-    const product = resolveProduct(route.id);
+    const product = resolveProductFrom(content.products, route.id);
     return `${product.title} SYSTEMMAG : ${product.summary}`;
   }
   if (route.kind === 'market') {
-    const market = resolveMarket(route.id);
-    return `${market.title} : ${market.headline} Applications, contraintes et produits SYSTEMMAG recommandés.`;
+    const market = resolveMarketFrom(content.markets, route.id);
+    return `${market.title} : ${market.headline} ${translateText('Applications, contraintes et produits SYSTEMMAG recommandés.', locale)}`;
   }
   if (route.kind === 'technology') {
-    return 'Principe SYSTEMMAG : auto-positionnement, maintien réparti, ouverture par pelage et intégration textile.';
+    return translateText('Principe SYSTEMMAG : auto-positionnement, maintien réparti, ouverture par pelage et intégration textile.', locale);
   }
   if (route.kind === 'products') {
-    return 'Catalogue SYSTEMMAG : zips magnétiques, bandes et blocs d’aimants, fourreaux et bureau d’étude pour intégration textile.';
+    return translateText('Catalogue SYSTEMMAG : zips magnétiques, bandes et blocs d’aimants, fourreaux et bureau d’étude pour intégration textile.', locale);
   }
   if (route.kind === 'markets') {
-    return 'Marchés SYSTEMMAG : défense, sport extrême, médical, mode, industrie technique et mobilité réduite.';
+    return translateText('Marchés SYSTEMMAG : défense, sport extrême, médical, mode, industrie technique et mobilité réduite.', locale);
   }
   if (route.kind === 'integration') {
-    return 'Savoir-faire SYSTEMMAG : cadrage, architecture magnétique, prototype et validation série.';
+    return translateText('Savoir-faire SYSTEMMAG : cadrage, architecture magnétique, prototype et validation série.', locale);
   }
   if (route.kind === 'blog' || route.kind === 'article') {
-    return 'Ressources SYSTEMMAG pour comprendre et cadrer une fermeture magnétique textile.';
+    return translateText('Ressources SYSTEMMAG pour comprendre et cadrer une fermeture magnétique textile.', locale);
   }
-  return 'SYSTEMMAG conçoit des fermetures magnétiques invisibles intégrées aux textiles, accessoires et équipements techniques.';
+  return translateText('SYSTEMMAG conçoit des fermetures magnétiques invisibles intégrées aux textiles, accessoires et équipements techniques.', locale);
 };
 
 const setMetaContent = (selector: string, content: string) => {
@@ -298,7 +366,7 @@ const setMetaContent = (selector: string, content: string) => {
   if (element) element.content = content;
 };
 
-const useScrollSystems = (route: AppRoute) => {
+const useScrollSystems = (route: AppRoute, locale: Locale) => {
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return undefined;
@@ -323,14 +391,14 @@ const useScrollSystems = (route: AppRoute) => {
   }, []);
 
   useEffect(() => {
-    const title = pageTitle(route);
-    const description = pageDescription(route);
+    const title = pageTitle(route, locale);
+    const description = pageDescription(route, locale);
     document.title = title;
     setMetaContent('meta[name="description"]', description);
     setMetaContent('meta[property="og:title"]', title);
     setMetaContent('meta[property="og:description"]', description);
     window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
-  }, [route]);
+  }, [route, locale]);
 
   useEffect(() => {
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -379,14 +447,14 @@ const useScrollSystems = (route: AppRoute) => {
 
     ScrollTrigger.refresh();
     return () => context.revert();
-  }, [route]);
+  }, [route, locale]);
 };
 
 const App: React.FC = () => {
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
   const [locale, setLocale] = useState<Locale>(() => getLocaleFromPath());
 
-  useScrollSystems(route);
+  useScrollSystems(route, locale);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -410,19 +478,21 @@ const App: React.FC = () => {
   };
 
   return (
-    <SiteShell route={route} navigate={navigate} locale={locale}>
-      <AnimatePresence mode="wait">
-        <motion.main
-          key={`${route.kind}${'id' in route ? route.id : ''}${'slug' in route ? route.slug : ''}`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
-        >
-          <RouteRenderer route={route} navigate={navigate} />
-        </motion.main>
-      </AnimatePresence>
-    </SiteShell>
+    <LocaleContext.Provider value={locale}>
+      <SiteShell route={route} navigate={navigate} locale={locale}>
+        <AnimatePresence mode="wait">
+          <motion.main
+            key={`${route.kind}${'id' in route ? route.id : ''}${'slug' in route ? route.slug : ''}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.28, ease: [0.2, 0.8, 0.2, 1] }}
+          >
+            <RouteRenderer route={route} navigate={navigate} />
+          </motion.main>
+        </AnimatePresence>
+      </SiteShell>
+    </LocaleContext.Provider>
   );
 };
 
@@ -430,17 +500,17 @@ const RouteRenderer: React.FC<{ route: AppRoute; navigate: NavigateFn }> = ({ ro
   if (route.kind === 'home') return <HomePage navigate={navigate} />;
   if (route.kind === 'technology') return <TechnologyPage navigate={navigate} />;
   if (route.kind === 'products') return <ProductsPage navigate={navigate} />;
-  if (route.kind === 'product') return <ProductPage product={resolveProduct(route.id)} navigate={navigate} />;
+  if (route.kind === 'product') return <ProductPage productId={route.id} navigate={navigate} />;
   if (route.kind === 'markets') return <MarketsPage navigate={navigate} />;
-  if (route.kind === 'market') return <MarketPage market={resolveMarket(route.id)} navigate={navigate} />;
+  if (route.kind === 'market') return <MarketPage marketId={route.id} navigate={navigate} />;
   if (route.kind === 'integration') return <IntegrationPage navigate={navigate} />;
   if (route.kind === 'about') return <AboutPage navigate={navigate} />;
   if (route.kind === 'contact') return <ContactPage navigate={navigate} />;
   if (route.kind === 'sample') return <SamplePage navigate={navigate} />;
   if (route.kind === 'blog') return <BlogPage navigate={navigate} />;
-  if (route.kind === 'article') return <ArticlePage post={resolveArticle(route.slug)} navigate={navigate} />;
+  if (route.kind === 'article') return <ArticlePage slug={route.slug} navigate={navigate} />;
   if (route.kind === 'press') return <PressPage navigate={navigate} />;
-  if (route.kind === 'legal') return <LegalPage page={resolveLegalPage(route.slug)} navigate={navigate} />;
+  if (route.kind === 'legal') return <LegalPage slug={route.slug} navigate={navigate} />;
   return <HomePage navigate={navigate} />;
 };
 
@@ -470,20 +540,25 @@ const SmartLink: React.FC<{
   children,
   onClick,
   ...rest
-}) => (
-  <a
-    href={localPath(to)}
-    className={className}
-    {...rest}
-    onClick={(event) => {
-      event.preventDefault();
-      onClick?.();
-      navigate(to);
-    }}
-  >
-    {children}
-  </a>
-);
+}) => {
+  const locale = useLocale();
+  const targetPath = pathForLocale(to, locale);
+
+  return (
+    <a
+      href={localPath(targetPath, locale)}
+      className={className}
+      {...rest}
+      onClick={(event) => {
+        event.preventDefault();
+        onClick?.();
+        navigate(targetPath, locale);
+      }}
+    >
+      {children}
+    </a>
+  );
+};
 
 const LanguageSwitch: React.FC<{ locale: Locale; navigate: NavigateFn; onChange?: () => void }> = ({
   locale,
@@ -497,14 +572,14 @@ const LanguageSwitch: React.FC<{ locale: Locale; navigate: NavigateFn; onChange?
       {LANGUAGE_OPTIONS.map((option) => (
         <a
           key={option.code}
-          href={localPath(currentPath, option.code)}
+          href={localPath(pathForLocale(currentPath, option.code), option.code)}
           className={option.code === locale ? 'active' : ''}
           aria-current={option.code === locale ? 'true' : undefined}
           aria-label={option.name}
           onClick={(event) => {
             event.preventDefault();
             onChange?.();
-            navigate(currentPath, option.code);
+            navigate(pathForLocale(currentPath, option.code), option.code);
           }}
         >
           {option.label}
@@ -636,76 +711,90 @@ const Header: React.FC<{ route: AppRoute; navigate: NavigateFn; locale: Locale }
   );
 };
 
-const ProductsMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ navigate, close }) => (
-  <div className="mega-grid">
-    <div>
-      <p className="mega-title">Familles de produits</p>
-      <p className="mega-copy">Choisir une fermeture, un module ou une intégration selon le geste attendu.</p>
-    </div>
-    <div className="mega-list">
-      {PRODUCTS.map((product) => (
-        <SmartLink key={product.id} to={productPath(product)} navigate={navigate} onClick={close} className="mega-item">
-          <span>{product.number}</span>
-          <strong>{product.title}</strong>
-          <small>{product.summary}</small>
-        </SmartLink>
-      ))}
-    </div>
-  </div>
-);
+const ProductsMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ navigate, close }) => {
+  const t = useText();
+  const { products } = useLocalizedContent();
 
-const MarketsMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ navigate, close }) => (
-  <div className="mega-grid">
-    <div>
-      <p className="mega-title">Applications</p>
-      <p className="mega-copy">Des usages où le geste, la discrétion et la fiabilité comptent.</p>
+  return (
+    <div className="mega-grid">
+      <div>
+        <p className="mega-title">{t('Familles de produits')}</p>
+        <p className="mega-copy">{t('Choisir une fermeture, un module ou une intégration selon le geste attendu.')}</p>
+      </div>
+      <div className="mega-list">
+        {products.map((product) => (
+          <SmartLink key={product.id} to={productPath(product)} navigate={navigate} onClick={close} className="mega-item">
+            <span>{product.number}</span>
+            <strong>{product.title}</strong>
+            <small>{product.summary}</small>
+          </SmartLink>
+        ))}
+      </div>
     </div>
-    <div className="mega-list mega-list-two">
-      {MARKETS.map((market) => (
-        <SmartLink key={market.id} to={marketPath(market)} navigate={navigate} onClick={close} className="mega-item">
-          <span>{market.title}</span>
-          <small>{market.description}</small>
-        </SmartLink>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
-const ResourcesMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ navigate, close }) => (
-  <div className="mega-grid">
-    <div>
-      <p className="mega-title">Documentation</p>
-      <p className="mega-copy">Comprendre le principe, cadrer un projet et préparer un échange technique.</p>
+const MarketsMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ navigate, close }) => {
+  const t = useText();
+  const { markets } = useLocalizedContent();
+
+  return (
+    <div className="mega-grid">
+      <div>
+        <p className="mega-title">{t('Applications')}</p>
+        <p className="mega-copy">{t('Des usages où le geste, la discrétion et la fiabilité comptent.')}</p>
+      </div>
+      <div className="mega-list mega-list-two">
+        {markets.map((market) => (
+          <SmartLink key={market.id} to={marketPath(market)} navigate={navigate} onClick={close} className="mega-item">
+            <span>{market.title}</span>
+            <small>{market.description}</small>
+          </SmartLink>
+        ))}
+      </div>
     </div>
-    <div className="mega-list mega-list-two">
-      <a href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer" className="mega-item" onClick={close}>
-        <span>PDF</span>
-        <strong>Catalogue technique</strong>
-        <small>Formats, familles et premières indications d’intégration.</small>
-      </a>
-      <SmartLink to="/blog" navigate={navigate} onClick={close} className="mega-item">
-        <span>Articles</span>
-        <strong>Ressources</strong>
-        <small>Guides de cadrage, technologie textile et usages.</small>
-      </SmartLink>
-      <SmartLink to="/press" navigate={navigate} onClick={close} className="mega-item">
-        <span>Presse</span>
-        <strong>Revue media</strong>
-        <small>Historique public et mentions de SYSTEMMAG.</small>
-      </SmartLink>
-      <SmartLink to="/about" navigate={navigate} onClick={close} className="mega-item">
-        <span>Entreprise</span>
-        <strong>Histoire et atelier</strong>
-        <small>Origine parisienne, brevets et savoir-faire industriel.</small>
-      </SmartLink>
-      <SmartLink to="/echantillon" navigate={navigate} onClick={close} className="mega-item">
-        <span>Projet</span>
-        <strong>Demande d’échantillon</strong>
-        <small>Qualifier un usage et préparer un premier essai.</small>
-      </SmartLink>
+  );
+};
+
+const ResourcesMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ navigate, close }) => {
+  const t = useText();
+
+  return (
+    <div className="mega-grid">
+      <div>
+        <p className="mega-title">{t('Documentation')}</p>
+        <p className="mega-copy">{t('Comprendre le principe, cadrer un projet et préparer un échange technique.')}</p>
+      </div>
+      <div className="mega-list mega-list-two">
+        <a href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer" className="mega-item" onClick={close}>
+          <span>PDF</span>
+          <strong>{t('Catalogue technique')}</strong>
+          <small>{t('Formats, familles et premières indications d’intégration.')}</small>
+        </a>
+        <SmartLink to="/blog" navigate={navigate} onClick={close} className="mega-item">
+          <span>{t('Articles')}</span>
+          <strong>{t('Ressources')}</strong>
+          <small>{t('Guides de cadrage, technologie textile et usages.')}</small>
+        </SmartLink>
+        <SmartLink to="/press" navigate={navigate} onClick={close} className="mega-item">
+          <span>{t('Presse')}</span>
+          <strong>{t('Revue media')}</strong>
+          <small>{t('Historique public et mentions de SYSTEMMAG.')}</small>
+        </SmartLink>
+        <SmartLink to="/about" navigate={navigate} onClick={close} className="mega-item">
+          <span>{t('Entreprise')}</span>
+          <strong>{t('Histoire et atelier')}</strong>
+          <small>{t('Origine parisienne, brevets et savoir-faire industriel.')}</small>
+        </SmartLink>
+        <SmartLink to="/echantillon" navigate={navigate} onClick={close} className="mega-item">
+          <span>{t('Projet')}</span>
+          <strong>{t('Demande d’échantillon')}</strong>
+          <small>{t('Qualifier un usage et préparer un premier essai.')}</small>
+        </SmartLink>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const PageIntro: React.FC<{
   label?: string;
@@ -730,8 +819,12 @@ const PageIntro: React.FC<{
 );
 
 const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
-  const [activeMarket, setActiveMarket] = useState(MARKETS[0]);
-  const [activeTech, setActiveTech] = useState(TECHNOLOGY_STEPS[0]);
+  const t = useText();
+  const content = useLocalizedContent();
+  const [activeMarketId, setActiveMarketId] = useState(MARKETS[0].id);
+  const [activeTechId, setActiveTechId] = useState(TECHNOLOGY_STEPS[0].id);
+  const activeMarket = resolveMarketFrom(content.markets, activeMarketId);
+  const activeTech = content.technologySteps.find((step) => step.id === activeTechId) ?? content.technologySteps[0];
 
   return (
     <>
@@ -739,18 +832,17 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
         <div className="hero-copy reveal">
           <span className="version-mark">[ v.01b ]</span>
           <h1>
-            La fermeture magnétique conçue pour <span>disparaître.</span>
+            {t('La fermeture magnétique conçue pour')} <span>{t('disparaître.')}</span>
           </h1>
           <p>
-            Systèmes magnétiques intégrés aux textiles, accessoires et équipements techniques pour créer des fermetures
-            discrètes, souples et adaptées à vos contraintes d’usage.
+            {t('Systèmes magnétiques intégrés aux textiles, accessoires et équipements techniques pour créer des fermetures discrètes, souples et adaptées à vos contraintes d’usage.')}
           </p>
           <div className="hero-actions">
             <SmartLink to="/contact" navigate={navigate} className="primary-action large">
-              Parler à un expert <ArrowRight size={18} />
+              {t('Parler à un expert')} <ArrowRight size={18} />
             </SmartLink>
             <a className="secondary-action" href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
-              Voir le catalogue <Download size={17} />
+              {t('Voir le catalogue')} <Download size={17} />
             </a>
           </div>
         </div>
@@ -760,16 +852,16 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
             <img src="/images/cinematic-hero-mockup-v3.png" alt="Détail textile d’une fermeture magnétique Systemmag" />
           </figure>
           <div className="hero-spec-card">
-            <span>Architecture produit</span>
-            {HERO_SPECS.map((item) => (
+            <span>{t('Architecture produit')}</span>
+            {content.heroSpecs.map((item) => (
               <div key={item.label}>
                 <small>{item.label}</small>
                 <strong>{item.value}</strong>
               </div>
             ))}
           </div>
-          <div className="hero-annotation top">Ruban textile technique</div>
-          <div className="hero-annotation bottom">Architecture magnétique intégrée</div>
+          <div className="hero-annotation top">{t('Ruban textile technique')}</div>
+          <div className="hero-annotation bottom">{t('Architecture magnétique intégrée')}</div>
         </div>
       </section>
 
@@ -778,14 +870,13 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
 
       <section className="section split-section" id="technology">
         <div className="section-copy reveal">
-          <p className="section-label">Technologie</p>
-          <h2>Une fermeture qui se positionne, maintient et s’ouvre naturellement.</h2>
+          <p className="section-label">{t('Technologie')}</p>
+          <h2>{t('Une fermeture qui se positionne, maintient et s’ouvre naturellement.')}</h2>
           <p>
-            Le système répartit la force dans le textile : l’utilisateur rapproche les deux parties, les polarités
-            s’alignent, puis l’ouverture se fait par pelage, aimant après aimant.
+            {t('Le système répartit la force dans le textile : l’utilisateur rapproche les deux parties, les polarités s’alignent, puis l’ouverture se fait par pelage, aimant après aimant.')}
           </p>
           <SmartLink to="/technology" navigate={navigate} className="text-link">
-            Découvrir le principe <ArrowRight size={16} />
+            {t('Découvrir le principe')} <ArrowRight size={16} />
           </SmartLink>
         </div>
 
@@ -794,13 +885,13 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
             <img src={activeTech.image} alt={activeTech.title} />
           </div>
           <div className="mechanism-steps">
-            {TECHNOLOGY_STEPS.map((step) => (
+            {content.technologySteps.map((step) => (
               <button
                 key={step.id}
                 className={step.id === activeTech.id ? 'mechanism-step active' : 'mechanism-step'}
-                onMouseEnter={() => setActiveTech(step)}
-                onFocus={() => setActiveTech(step)}
-                onClick={() => setActiveTech(step)}
+                onMouseEnter={() => setActiveTechId(step.id)}
+                onFocus={() => setActiveTechId(step.id)}
+                onClick={() => setActiveTechId(step.id)}
               >
                 <span>{String(step.id).padStart(2, '0')}</span>
                 <strong>{step.title}</strong>
@@ -814,19 +905,18 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
       <section className="section product-system" id="products">
         <div className="section-head reveal">
           <div>
-            <p className="section-label">Produits</p>
-            <h2>Familles produits pour composer votre fermeture.</h2>
+            <p className="section-label">{t('Produits')}</p>
+            <h2>{t('Familles produits pour composer votre fermeture.')}</h2>
             <p className="section-deck">
-              Un catalogue court, lisible par les équipes produit, R&D et production : le composant est toujours relié
-              au geste et au mode d’intégration.
+              {t('Un catalogue court, lisible par les équipes produit, R&D et production : le composant est toujours relié au geste et au mode d’intégration.')}
             </p>
           </div>
           <SmartLink to="/produits" navigate={navigate} className="secondary-action dark">
-            Tous les produits <ArrowRight size={17} />
+            {t('Tous les produits')} <ArrowRight size={17} />
           </SmartLink>
         </div>
         <div className="product-rows">
-          {PRODUCTS.map((product) => (
+          {content.products.map((product) => (
             <SmartLink key={product.id} to={productPath(product)} navigate={navigate} className="product-row reveal">
               <span className="row-number">{product.number}</span>
               <span className="row-image">
@@ -850,25 +940,25 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
       <section className="section markets-section" id="markets">
         <div className="market-stage reveal" style={{ backgroundImage: `url(${activeMarket.image})` }}>
           <div>
-            <p className="section-label light">Marchés</p>
-            <h2>Conçu pour les produits où le geste ne doit pas échouer.</h2>
+            <p className="section-label light">{t('Marchés')}</p>
+            <h2>{t('Conçu pour les produits où le geste ne doit pas échouer.')}</h2>
             <p>{activeMarket.headline}</p>
             <SmartLink to={marketPath(activeMarket)} navigate={navigate} className="primary-action">
-              Voir {activeMarket.title} <ArrowRight size={17} />
+              {t('Voir')} {activeMarket.title} <ArrowRight size={17} />
             </SmartLink>
           </div>
         </div>
         <div className="market-list reveal">
-          {MARKETS.map((market) => (
+          {content.markets.map((market, index) => (
             <SmartLink
               key={market.id}
               to={marketPath(market)}
               navigate={navigate}
               className={market.id === activeMarket.id ? 'market-row active' : 'market-row'}
-              onMouseEnter={() => setActiveMarket(market)}
-              onFocus={() => setActiveMarket(market)}
+              onMouseEnter={() => setActiveMarketId(market.id)}
+              onFocus={() => setActiveMarketId(market.id)}
             >
-              <span>{String(MARKETS.indexOf(market) + 1).padStart(2, '0')}</span>
+              <span>{String(index + 1).padStart(2, '0')}</span>
               <strong>{market.title}</strong>
               <small>{market.description}</small>
             </SmartLink>
@@ -879,19 +969,18 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
       <section className="section architecture-section">
         <div className="architecture-panel reveal">
           <div>
-            <p className="section-label light">Architecture</p>
-            <h2>Un choix de fermeture commence par la contrainte d’usage.</h2>
+            <p className="section-label light">{t('Architecture')}</p>
+            <h2>{t('Un choix de fermeture commence par la contrainte d’usage.')}</h2>
             <p>
-              La bonne réponse n’est pas seulement un format d’aimant. C’est un équilibre entre support, force,
-              finition, manipulation et industrialisation.
+              {t('La bonne réponse n’est pas seulement un format d’aimant. C’est un équilibre entre support, force, finition, manipulation et industrialisation.')}
             </p>
           </div>
           <SmartLink to="/integration" navigate={navigate} className="secondary-action inverted">
-            Parler intégration <ArrowRight size={16} />
+            {t('Parler intégration')} <ArrowRight size={16} />
           </SmartLink>
         </div>
         <div className="buyer-path-grid">
-          {BUYER_PATHS.map(({ icon: Icon, title, text }) => (
+          {content.buyerPaths.map(({ icon: Icon, title, text }) => (
             <article key={title} className="buyer-path reveal">
               <Icon size={22} />
               <h3>{title}</h3>
@@ -900,7 +989,7 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
           ))}
         </div>
         <div className="decision-grid">
-          {PRODUCT_DECISION_PATHS.map((path, index) => (
+          {content.productDecisionPaths.map((path, index) => (
             <article key={path.title} className="decision-card reveal">
               <span>{String(index + 1).padStart(2, '0')}</span>
               <h3>{path.title}</h3>
@@ -920,225 +1009,287 @@ const HomePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
 };
 
 const TrustStrip: React.FC = () => (
-  <section className="trust-strip">
-    <div className="trust-lead">
-      <span>Engineered performance</span>
-      <strong>Preuve technique avant effet visuel.</strong>
-    </div>
-    {PROOF_ITEMS.map(({ icon: Icon, label, value }) => (
-      <article key={label}>
-        <Icon size={27} />
-        <strong>{label}</strong>
-        <span>{value}</span>
-      </article>
-    ))}
-  </section>
+  <TrustStripContent />
 );
+
+const TrustStripContent: React.FC = () => {
+  const t = useText();
+  const { proofItems } = useLocalizedContent();
+
+  return (
+    <section className="trust-strip">
+      <div className="trust-lead">
+        <span>{t('Engineered performance')}</span>
+        <strong>{t('Preuve technique avant effet visuel.')}</strong>
+      </div>
+      {proofItems.map(({ icon: Icon, label, value }) => (
+        <article key={label}>
+          <Icon size={27} />
+          <strong>{label}</strong>
+          <span>{value}</span>
+        </article>
+      ))}
+    </section>
+  );
+};
 
 const CredibilityBand: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <section className="credibility-band">
-    <div className="credibility-copy reveal">
-      <p className="section-label light">Preuves industrielles</p>
-      <h2>Un système discret, mais une décision technique complète.</h2>
-      <p>
-        La fermeture magnétique n’est pas traitée comme un accessoire décoratif. Chaque projet est cadré autour du
-        geste, du support, de la force utile, de la finition visible et du passage en série.
-      </p>
-      <div className="credibility-actions">
-        <SmartLink to="/integration" navigate={navigate} className="secondary-action inverted">
-          Voir la méthode <ArrowRight size={16} />
-        </SmartLink>
-        <a className="text-link light-link" href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
-          Catalogue technique <Download size={16} />
-        </a>
-      </div>
-    </div>
-
-    <div className="credibility-badges reveal">
-      {TRUST_BADGES.map((badge) => (
-        <article key={badge.label}>
-          <strong>{badge.label}</strong>
-          <span>{badge.value}</span>
-        </article>
-      ))}
-    </div>
-  </section>
+  <CredibilityBandContent navigate={navigate} />
 );
 
-const QualificationSection: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <section className="section qualification-section">
-    <div className="qualification-intro reveal">
-      <p className="section-label">Qualification</p>
-      <h2>Le bon choix commence par les contraintes du produit.</h2>
-      <p>
-        Une page professionnelle doit aider l’acheteur à se situer avant le premier échange. SYSTEMMAG guide le choix
-        entre zip, bande, fourreau ou développement spécifique en partant de critères concrets.
-      </p>
-      <SmartLink to="/contact" navigate={navigate} className="primary-action">
-        Qualifier un projet <ArrowRight size={17} />
-      </SmartLink>
-    </div>
+const CredibilityBandContent: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { trustBadges } = useLocalizedContent();
 
-    <div className="qualification-table reveal">
-      {QUALIFICATION_POINTS.map((point) => (
-        <article key={point.label}>
-          <span>{point.label}</span>
-          <strong>{point.title}</strong>
-          <p>{point.question}</p>
-          <small>{point.answer}</small>
-        </article>
-      ))}
-    </div>
-
-    <div className="buyer-role-rail reveal">
-      {BUYER_ROLES.map((role) => (
-        <article key={role.team}>
-          <span>{role.team}</span>
-          <p>{role.need}</p>
-          <strong>{role.output}</strong>
-        </article>
-      ))}
-    </div>
-  </section>
-);
-
-const ProcessPreview: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <section className="section process-preview" id="integration">
-    <div className="section-copy reveal">
-      <p className="section-label">Du prototype à la série</p>
-      <h2>Un accompagnement pour transformer une idée de fermeture en solution industrialisable.</h2>
-      <p>
-        La valeur de Systemmag est autant dans le composant que dans son intégration : force, textile, couture, finition,
-        lavage, usage et volume sont cadrés ensemble.
-      </p>
-    </div>
-    <div className="process-track">
-      {PROCESS_STEPS.map((step) => (
-        <article key={step.id} className="process-card reveal">
-          <img src={step.image} alt="" />
-          <span>{String(step.id).padStart(2, '0')}</span>
-          <h3>{step.title}</h3>
-          <p>{step.description}</p>
-        </article>
-      ))}
-    </div>
-    <SmartLink to="/integration" navigate={navigate} className="secondary-action dark reveal">
-      Voir le savoir-faire <ArrowRight size={17} />
-    </SmartLink>
-  </section>
-);
-
-const ResourcesPreview: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <section className="section resources-preview">
-    <div className="section-head reveal">
-      <div>
-        <p className="section-label">Ressources</p>
-        <h2>De la documentation pour avancer avec vos équipes.</h2>
-      </div>
-      <SmartLink to="/blog" navigate={navigate} className="text-link">
-        Toutes les ressources <ArrowRight size={16} />
-      </SmartLink>
-    </div>
-    <div className="resource-grid">
-      {BLOG_POSTS.map((post) => (
-        <SmartLink key={post.slug} to={`/blog/${post.slug}`} navigate={navigate} className="resource-card reveal">
-          <img src={post.coverImage} alt="" />
-          <span>{post.category}</span>
-          <h3>{post.title}</h3>
-          <p>{post.excerpt}</p>
-        </SmartLink>
-      ))}
-    </div>
-  </section>
-);
-
-const FinalCta: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <section className="final-cta reveal">
-    <div>
-      <h2>Une question technique ou un projet à cadrer ?</h2>
-      <p>Présentez votre produit, votre contrainte d’usage ou votre besoin d’échantillon.</p>
-    </div>
-    <div className="cta-actions">
-      <SmartLink to="/contact" navigate={navigate} className="primary-action large">
-        Parler à un expert <ArrowRight size={18} />
-      </SmartLink>
-      <SmartLink to="/echantillon" navigate={navigate} className="secondary-action dark">
-        Demander un échantillon
-      </SmartLink>
-    </div>
-  </section>
-);
-
-const ProductsPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <>
-    <PageIntro
-      label="Produits"
-      title="Un catalogue court, pensé pour l’intégration."
-      copy="Systemmag propose des familles de composants et un bureau d’étude pour adapter la fermeture magnétique au produit final."
-      image="/images/cinematic-product-theatre-v3.png"
-      actions={
-        <>
-          <a className="primary-action" href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
-            Télécharger le catalogue <Download size={17} />
-          </a>
-          <SmartLink to="/contact" navigate={navigate} className="secondary-action dark">
-            Parler à un expert
+  return (
+    <section className="credibility-band">
+      <div className="credibility-copy reveal">
+        <p className="section-label light">{t('Preuves industrielles')}</p>
+        <h2>{t('Un système discret, mais une décision technique complète.')}</h2>
+        <p>
+          {t('La fermeture magnétique n’est pas traitée comme un accessoire décoratif. Chaque projet est cadré autour du geste, du support, de la force utile, de la finition visible et du passage en série.')}
+        </p>
+        <div className="credibility-actions">
+          <SmartLink to="/integration" navigate={navigate} className="secondary-action inverted">
+            {t('Voir la méthode')} <ArrowRight size={16} />
           </SmartLink>
-        </>
-      }
-    />
-    <section className="section catalogue-grid-section">
-      <div className="catalogue-grid">
-        {PRODUCTS.map((product) => (
-          <ProductCatalogueCard key={product.id} product={product} navigate={navigate} />
-        ))}
-      </div>
-    </section>
-    <section className="section formats-section">
-      <div className="section-head reveal">
-        <div>
-          <p className="section-label">Formats BA</p>
-          <h2>Bandes aimantées disponibles pour cadrer la force.</h2>
+          <a className="text-link light-link" href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
+            {t('Catalogue technique')} <Download size={16} />
+          </a>
         </div>
       </div>
-      <div className="format-grid">
-        {BA_FORMATS.map((format) => (
-          <article key={format.id} className="format-card reveal">
-            <img src={format.image} alt={format.title} />
-            <h3>{format.title}</h3>
-            <p>{format.meta}</p>
+
+      <div className="credibility-badges reveal">
+        {trustBadges.map((badge) => (
+          <article key={badge.label}>
+            <strong>{badge.label}</strong>
+            <span>{badge.value}</span>
           </article>
         ))}
       </div>
     </section>
-    <FinalCta navigate={navigate} />
-  </>
+  );
+};
+
+const QualificationSection: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
+  <QualificationSectionContent navigate={navigate} />
 );
 
-const ProductCatalogueCard: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = ({ product, navigate }) => (
-  <article className="catalogue-card reveal">
-    <div className="catalogue-media">
-      <img src={product.image} alt={product.title} />
-    </div>
-    <div className="catalogue-content">
-      <span>{product.number}</span>
-      <h2>{product.title}</h2>
-      <p>{product.summary}</p>
-      <ul>
-        {product.specs.map((spec) => (
-          <li key={spec}>
-            <Check size={15} /> {spec}
-          </li>
+const QualificationSectionContent: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { qualificationPoints, buyerRoles } = useLocalizedContent();
+
+  return (
+    <section className="section qualification-section">
+      <div className="qualification-intro reveal">
+        <p className="section-label">{t('Qualification')}</p>
+        <h2>{t('Le bon choix commence par les contraintes du produit.')}</h2>
+        <p>
+          {t('Une page professionnelle doit aider l’acheteur à se situer avant le premier échange. SYSTEMMAG guide le choix entre zip, bande, fourreau ou développement spécifique en partant de critères concrets.')}
+        </p>
+        <SmartLink to="/contact" navigate={navigate} className="primary-action">
+          {t('Qualifier un projet')} <ArrowRight size={17} />
+        </SmartLink>
+      </div>
+
+      <div className="qualification-table reveal">
+        {qualificationPoints.map((point) => (
+          <article key={point.label}>
+            <span>{point.label}</span>
+            <strong>{point.title}</strong>
+            <p>{point.question}</p>
+            <small>{point.answer}</small>
+          </article>
         ))}
-      </ul>
-      <SmartLink to={productPath(product)} navigate={navigate} className="text-link">
-        Voir la famille <ArrowRight size={16} />
-      </SmartLink>
-    </div>
-  </article>
+      </div>
+
+      <div className="buyer-role-rail reveal">
+        {buyerRoles.map((role) => (
+          <article key={role.team}>
+            <span>{role.team}</span>
+            <p>{role.need}</p>
+            <strong>{role.output}</strong>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const ProcessPreview: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
+  <ProcessPreviewContent navigate={navigate} />
 );
 
-const ProductPage: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = ({ product, navigate }) => {
+const ProcessPreviewContent: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { processSteps } = useLocalizedContent();
+
+  return (
+    <section className="section process-preview" id="integration">
+      <div className="section-copy reveal">
+        <p className="section-label">{t('Du prototype à la série')}</p>
+        <h2>{t('Un accompagnement pour transformer une idée de fermeture en solution industrialisable.')}</h2>
+        <p>
+          {t('La valeur de Systemmag est autant dans le composant que dans son intégration : force, textile, couture, finition, lavage, usage et volume sont cadrés ensemble.')}
+        </p>
+      </div>
+      <div className="process-track">
+        {processSteps.map((step) => (
+          <article key={step.id} className="process-card reveal">
+            <img src={step.image} alt="" />
+            <span>{String(step.id).padStart(2, '0')}</span>
+            <h3>{step.title}</h3>
+            <p>{step.description}</p>
+          </article>
+        ))}
+      </div>
+      <SmartLink to="/integration" navigate={navigate} className="secondary-action dark reveal">
+        {t('Voir le savoir-faire')} <ArrowRight size={17} />
+      </SmartLink>
+    </section>
+  );
+};
+
+const ResourcesPreview: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
+  <ResourcesPreviewContent navigate={navigate} />
+);
+
+const ResourcesPreviewContent: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { blogPosts } = useLocalizedContent();
+
+  return (
+    <section className="section resources-preview">
+      <div className="section-head reveal">
+        <div>
+          <p className="section-label">{t('Ressources')}</p>
+          <h2>{t('De la documentation pour avancer avec vos équipes.')}</h2>
+        </div>
+        <SmartLink to="/blog" navigate={navigate} className="text-link">
+          {t('Toutes les ressources')} <ArrowRight size={16} />
+        </SmartLink>
+      </div>
+      <div className="resource-grid">
+        {blogPosts.map((post) => (
+          <SmartLink key={post.slug} to={`/blog/${post.slug}`} navigate={navigate} className="resource-card reveal">
+            <img src={post.coverImage} alt="" />
+            <span>{post.category}</span>
+            <h3>{post.title}</h3>
+            <p>{post.excerpt}</p>
+          </SmartLink>
+        ))}
+      </div>
+    </section>
+  );
+};
+
+const FinalCta: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
+  <FinalCtaContent navigate={navigate} />
+);
+
+const FinalCtaContent: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+
+  return (
+    <section className="final-cta reveal">
+      <div>
+        <h2>{t('Une question technique ou un projet à cadrer ?')}</h2>
+        <p>{t('Présentez votre produit, votre contrainte d’usage ou votre besoin d’échantillon.')}</p>
+      </div>
+      <div className="cta-actions">
+        <SmartLink to="/contact" navigate={navigate} className="primary-action large">
+          {t('Parler à un expert')} <ArrowRight size={18} />
+        </SmartLink>
+        <SmartLink to="/echantillon" navigate={navigate} className="secondary-action dark">
+          {t('Demander un échantillon')}
+        </SmartLink>
+      </div>
+    </section>
+  );
+};
+
+const ProductsPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { products, baFormats } = useLocalizedContent();
+
+  return (
+    <>
+      <PageIntro
+        label={t('Produits')}
+        title={t('Un catalogue court, pensé pour l’intégration.')}
+        copy={t('Systemmag propose des familles de composants et un bureau d’étude pour adapter la fermeture magnétique au produit final.')}
+        image="/images/cinematic-product-theatre-v3.png"
+        actions={
+          <>
+            <a className="primary-action" href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
+              {t('Télécharger le catalogue')} <Download size={17} />
+            </a>
+            <SmartLink to="/contact" navigate={navigate} className="secondary-action dark">
+              {t('Parler à un expert')}
+            </SmartLink>
+          </>
+        }
+      />
+      <section className="section catalogue-grid-section">
+        <div className="catalogue-grid">
+          {products.map((product) => (
+            <ProductCatalogueCard key={product.id} product={product} navigate={navigate} />
+          ))}
+        </div>
+      </section>
+      <section className="section formats-section">
+        <div className="section-head reveal">
+          <div>
+            <p className="section-label">{t('Formats BA')}</p>
+            <h2>{t('Bandes aimantées disponibles pour cadrer la force.')}</h2>
+          </div>
+        </div>
+        <div className="format-grid">
+          {baFormats.map((format) => (
+            <article key={format.id} className="format-card reveal">
+              <img src={format.image} alt={format.title} />
+              <h3>{format.title}</h3>
+              <p>{format.meta}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+      <FinalCta navigate={navigate} />
+    </>
+  );
+};
+
+const ProductCatalogueCard: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = ({ product, navigate }) => {
+  const t = useText();
+
+  return (
+    <article className="catalogue-card reveal">
+      <div className="catalogue-media">
+        <img src={product.image} alt={product.title} />
+      </div>
+      <div className="catalogue-content">
+        <span>{product.number}</span>
+        <h2>{product.title}</h2>
+        <p>{product.summary}</p>
+        <ul>
+          {product.specs.map((spec) => (
+            <li key={spec}>
+              <Check size={15} /> {spec}
+            </li>
+          ))}
+        </ul>
+        <SmartLink to={productPath(product)} navigate={navigate} className="text-link">
+          {t('Voir la famille')} <ArrowRight size={16} />
+        </SmartLink>
+      </div>
+    </article>
+  );
+};
+
+const ProductPage: React.FC<{ productId: string; navigate: NavigateFn }> = ({ productId, navigate }) => {
+  const t = useText();
+  const { products } = useLocalizedContent();
+  const product = resolveProductFrom(products, productId);
   const galleryImages = useMemo(() => Array.from(new Set([product.image, ...product.gallery])), [product]);
   const [activeImage, setActiveImage] = useState(galleryImages[0] ?? product.image);
 
@@ -1150,8 +1301,8 @@ const ProductPage: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = 
     <>
       <section className="product-detail-hero">
         <aside className="product-sidebar reveal">
-          <p>Produits</p>
-          {PRODUCTS.map((item) => (
+          <p>{t('Produits')}</p>
+          {products.map((item) => (
             <SmartLink
               key={item.id}
               to={productPath(item)}
@@ -1162,23 +1313,23 @@ const ProductPage: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = 
             </SmartLink>
           ))}
           <a href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
-            <FileText size={17} /> Catalogue technique
+            <FileText size={17} /> {t('Catalogue technique')}
           </a>
         </aside>
 
         <div className="product-hero-copy reveal">
           <SmartLink to="/produits" navigate={navigate} className="back-link">
-            <ChevronLeft size={16} /> Produits
+            <ChevronLeft size={16} /> {t('Produits')}
           </SmartLink>
           <span className="section-label">{product.label}</span>
           <h1>{product.title}</h1>
           <p>{product.detailIntro}</p>
           <div className="hero-actions">
             <SmartLink to="/contact" navigate={navigate} className="primary-action">
-              Parler à un expert <ArrowRight size={17} />
+              {t('Parler à un expert')} <ArrowRight size={17} />
             </SmartLink>
             <SmartLink to="/echantillon" navigate={navigate} className="secondary-action dark">
-              Demander un échantillon
+              {t('Demander un échantillon')}
             </SmartLink>
           </div>
           <div className="product-hero-specs">
@@ -1213,12 +1364,12 @@ const ProductPage: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = 
 
       <section className="section product-detail-layout">
         <div className="detail-main">
-          <InfoBlock title="Applications" items={product.useCases} />
-          <InfoBlock title="Méthodes d’intégration" items={product.integration} />
-          <InfoBlock title="Contraintes cadrées" items={product.constraints} />
+          <InfoBlock title={t('Applications')} items={product.useCases} />
+          <InfoBlock title={t('Méthodes d’intégration')} items={product.integration} />
+          <InfoBlock title={t('Contraintes cadrées')} items={product.constraints} />
         </div>
         <div className="variant-panel reveal">
-          <h2>Variantes disponibles</h2>
+          <h2>{t('Variantes disponibles')}</h2>
           {product.variants?.map((variant) => (
             <article key={variant.label}>
               <strong>{variant.label}</strong>
@@ -1232,8 +1383,8 @@ const ProductPage: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = 
       <section className="section spec-section">
         <div className="section-head reveal">
           <div>
-            <p className="section-label">Spécifications</p>
-            <h2>Premiers repères techniques.</h2>
+            <p className="section-label">{t('Spécifications')}</p>
+            <h2>{t('Premiers repères techniques.')}</h2>
           </div>
         </div>
         <SpecTable rows={product.specificationRows} />
@@ -1270,93 +1421,108 @@ const SpecTable: React.FC<{ rows: Array<{ label: string; value: string }> }> = (
 );
 
 const MarketsPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <>
-    <PageIntro
-      label="Marchés"
-      title="Six terrains où la fermeture devient une décision produit."
-      copy="La même technologie prend une forme différente selon le geste, le support textile, l’environnement et les contraintes de production."
-      image="/images/markets-hero-collage.png"
-    />
-    <section className="section market-cards-section">
-      <div className="market-card-grid">
-        {MARKETS.map((market) => (
-          <SmartLink key={market.id} to={marketPath(market)} navigate={navigate} className="market-card reveal">
-            <img src={market.image} alt="" />
-            <div>
-              <h2>{market.title}</h2>
-              <p>{market.headline}</p>
-              <span>
-                Voir le marché <ArrowRight size={16} />
-              </span>
-            </div>
-          </SmartLink>
-        ))}
-      </div>
-    </section>
-  </>
+  <MarketsPageContent navigate={navigate} />
 );
 
-const MarketPage: React.FC<{ market: Market; navigate: NavigateFn }> = ({ market, navigate }) => (
-  <>
-    <section className="market-detail-hero" style={{ backgroundImage: `url(${market.image})` }}>
-      <div className="market-detail-copy reveal">
-        <SmartLink to="/marches" navigate={navigate} className="back-link light">
-          <ChevronLeft size={16} /> Marchés
-        </SmartLink>
-        <h1>{market.title}</h1>
-        <p>{market.headline}</p>
-        <SmartLink to="/contact" navigate={navigate} className="primary-action">
-          Discuter de ce marché <ArrowRight size={17} />
-        </SmartLink>
-      </div>
-    </section>
+const MarketsPageContent: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { markets } = useLocalizedContent();
 
-    <section className="section market-detail-grid">
-      <div className="market-needs reveal">
-        <h2>Contraintes fréquentes</h2>
-        {market.needs.map((need) => (
-          <div key={need}>
-            <Check size={16} /> {need}
-          </div>
-        ))}
-      </div>
-      <div className="market-specs reveal">
-        <h2>Lecture technique</h2>
-        {(market.specs ?? []).map((spec) => (
-          <article key={spec.label}>
-            <span>{spec.label}</span>
-            <p>{spec.value}</p>
-          </article>
-        ))}
-      </div>
-      <div className="market-applications reveal">
-        <h2>Applications</h2>
-        <ul>
-          {market.applications.map((application) => (
-            <li key={application}>{application}</li>
+  return (
+    <>
+      <PageIntro
+        label={t('Marchés')}
+        title={t('Six terrains où la fermeture devient une décision produit.')}
+        copy={t('La même technologie prend une forme différente selon le geste, le support textile, l’environnement et les contraintes de production.')}
+        image="/images/markets-hero-collage.png"
+      />
+      <section className="section market-cards-section">
+        <div className="market-card-grid">
+          {markets.map((market) => (
+            <SmartLink key={market.id} to={marketPath(market)} navigate={navigate} className="market-card reveal">
+              <img src={market.image} alt="" />
+              <div>
+                <h2>{market.title}</h2>
+                <p>{market.headline}</p>
+                <span>
+                  {t('Voir le marché')} <ArrowRight size={16} />
+                </span>
+              </div>
+            </SmartLink>
           ))}
-        </ul>
-      </div>
-    </section>
-
-    <section className="section recommended-section">
-      <div className="section-head reveal">
-        <div>
-          <p className="section-label">Produits recommandés</p>
-          <h2>Configurations à étudier pour {market.title.toLowerCase()}.</h2>
         </div>
-      </div>
-      <div className="recommended-grid">
-        {PRODUCTS.filter((product) => market.recommendedProducts.includes(product.title)).map((product) => (
-          <ProductMiniCard key={product.id} product={product} navigate={navigate} />
-        ))}
-      </div>
-    </section>
+      </section>
+    </>
+  );
+};
 
-    <FaqSection faq={market.faq ?? []} />
-    <FinalCta navigate={navigate} />
-  </>
-);
+const MarketPage: React.FC<{ marketId: string; navigate: NavigateFn }> = ({ marketId, navigate }) => {
+  const t = useText();
+  const { markets, products } = useLocalizedContent();
+  const market = resolveMarketFrom(markets, marketId);
+
+  return (
+    <>
+      <section className="market-detail-hero" style={{ backgroundImage: `url(${market.image})` }}>
+        <div className="market-detail-copy reveal">
+          <SmartLink to="/marches" navigate={navigate} className="back-link light">
+            <ChevronLeft size={16} /> {t('Marchés')}
+          </SmartLink>
+          <h1>{market.title}</h1>
+          <p>{market.headline}</p>
+          <SmartLink to="/contact" navigate={navigate} className="primary-action">
+            {t('Discuter de ce marché')} <ArrowRight size={17} />
+          </SmartLink>
+        </div>
+      </section>
+
+      <section className="section market-detail-grid">
+        <div className="market-needs reveal">
+          <h2>{t('Contraintes fréquentes')}</h2>
+          {market.needs.map((need) => (
+            <div key={need}>
+              <Check size={16} /> {need}
+            </div>
+          ))}
+        </div>
+        <div className="market-specs reveal">
+          <h2>{t('Lecture technique')}</h2>
+          {(market.specs ?? []).map((spec) => (
+            <article key={spec.label}>
+              <span>{spec.label}</span>
+              <p>{spec.value}</p>
+            </article>
+          ))}
+        </div>
+        <div className="market-applications reveal">
+          <h2>{t('Applications')}</h2>
+          <ul>
+            {market.applications.map((application) => (
+              <li key={application}>{application}</li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      <section className="section recommended-section">
+        <div className="section-head reveal">
+          <div>
+            <p className="section-label">{t('Produits recommandés')}</p>
+            <h2>{t('Configurations à étudier pour')} {market.title.toLowerCase()}.</h2>
+          </div>
+        </div>
+        <div className="recommended-grid">
+          {products.filter((product) => market.recommendedProducts.includes(product.title)).map((product) => (
+            <ProductMiniCard key={product.id} product={product} navigate={navigate} />
+          ))}
+        </div>
+      </section>
+
+      <FaqSection faq={market.faq ?? []} />
+      <FinalCta navigate={navigate} />
+    </>
+  );
+};
 
 const ProductMiniCard: React.FC<{ product: ProductFamily; navigate: NavigateFn }> = ({ product, navigate }) => (
   <SmartLink to={productPath(product)} navigate={navigate} className="mini-card reveal">
@@ -1367,18 +1533,21 @@ const ProductMiniCard: React.FC<{ product: ProductFamily; navigate: NavigateFn }
 );
 
 const TechnologyPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
-  const [activeStep, setActiveStep] = useState(TECHNOLOGY_STEPS[0]);
+  const t = useText();
+  const { technologySteps, technologyCapabilities, technologyComparison } = useLocalizedContent();
+  const [activeStepId, setActiveStepId] = useState(technologySteps[0].id);
+  const activeStep = technologySteps.find((step) => step.id === activeStepId) ?? technologySteps[0];
 
   return (
     <>
       <PageIntro
-        label="Technologie"
-        title="Auto-positionnement, maintien réparti, ouverture par pelage."
-        copy="SYSTEMMAG organise les polarités dans le textile pour rendre le geste plus tolérant : les deux parties se rapprochent, se positionnent et s’attirent automatiquement."
+        label={t('Technologie')}
+        title={t('Auto-positionnement, maintien réparti, ouverture par pelage.')}
+        copy={t('SYSTEMMAG organise les polarités dans le textile pour rendre le geste plus tolérant : les deux parties se rapprochent, se positionnent et s’attirent automatiquement.')}
         image="/images/technology-hero-ai-workbench.png"
         actions={
           <SmartLink to="/contact" navigate={navigate} className="primary-action">
-            Étudier une application <ArrowRight size={17} />
+            {t('Étudier une application')} <ArrowRight size={17} />
           </SmartLink>
         }
       />
@@ -1387,13 +1556,13 @@ const TechnologyPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
           <img src={activeStep.image} alt={activeStep.title} />
         </div>
         <div className="tech-steps reveal">
-          {TECHNOLOGY_STEPS.map((step) => (
+          {technologySteps.map((step) => (
             <button
               key={step.id}
               className={step.id === activeStep.id ? 'active' : ''}
-              onMouseEnter={() => setActiveStep(step)}
-              onFocus={() => setActiveStep(step)}
-              onClick={() => setActiveStep(step)}
+              onMouseEnter={() => setActiveStepId(step.id)}
+              onFocus={() => setActiveStepId(step.id)}
+              onClick={() => setActiveStepId(step.id)}
             >
               <span>{String(step.id).padStart(2, '0')}</span>
               <h2>{step.title}</h2>
@@ -1405,12 +1574,12 @@ const TechnologyPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
       <section className="section capability-section">
         <div className="section-head reveal">
           <div>
-            <p className="section-label">Capacités</p>
-            <h2>Ce que la technologie apporte au produit final.</h2>
+            <p className="section-label">{t('Capacités')}</p>
+            <h2>{t('Ce que la technologie apporte au produit final.')}</h2>
           </div>
         </div>
         <div className="capability-grid">
-          {TECHNOLOGY_CAPABILITIES.map((capability) => (
+          {technologyCapabilities.map((capability) => (
             <article key={capability.title} className="capability-card reveal">
               <h3>{capability.title}</h3>
               <p>{capability.text}</p>
@@ -1420,8 +1589,8 @@ const TechnologyPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
       </section>
       <section className="section comparison-section">
         <div className="comparison-panel reveal">
-          <h2>Comparaison d’usage</h2>
-          {TECHNOLOGY_COMPARISON.map((item) => (
+          <h2>{t('Comparaison d’usage')}</h2>
+          {technologyComparison.map((item) => (
             <div key={item.label}>
               <span>{item.label}</span>
               <p>{item.value}</p>
@@ -1434,226 +1603,269 @@ const TechnologyPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
   );
 };
 
-const IntegrationPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <>
-    <PageIntro
-      label="Savoir-faire"
-      title="Du cadrage au passage en série."
-      copy="SYSTEMMAG accompagne vos équipes pour convertir une contrainte d’usage en architecture magnétique intégrable, testée et documentée."
+const IntegrationPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { processSteps } = useLocalizedContent();
+
+  return (
+    <>
+      <PageIntro
+        label={t('Savoir-faire')}
+        title={t('Du cadrage au passage en série.')}
+        copy={t('SYSTEMMAG accompagne vos équipes pour convertir une contrainte d’usage en architecture magnétique intégrable, testée et documentée.')}
         image="/images/cadrage-blueprint.png"
         actions={
-        <SmartLink to="/contact" navigate={navigate} className="primary-action">
-          Démarrer un cadrage <ArrowRight size={17} />
+          <SmartLink to="/contact" navigate={navigate} className="primary-action">
+            {t('Démarrer un cadrage')} <ArrowRight size={17} />
+          </SmartLink>
+        }
+      />
+      <section className="section process-deep">
+        {processSteps.map((step) => (
+          <article key={step.id} className="process-deep-row reveal">
+            <span>{String(step.id).padStart(2, '0')}</span>
+            <img src={step.image} alt="" />
+            <div>
+              <h2>{step.title}</h2>
+              <p>{step.description}</p>
+            </div>
+          </article>
+        ))}
+      </section>
+      <FinalCta navigate={navigate} />
+    </>
+  );
+};
+
+const AboutPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { aboutTimeline } = useLocalizedContent();
+
+  return (
+    <>
+      <PageIntro
+        label={t('Entreprise')}
+        title={t('Une technologie magnétique textile née et développée à Paris.')}
+        copy={t('Depuis 2000, SYSTEMMAG développe des systèmes brevetés pour rendre les fermetures plus discrètes, plus rapides et plus adaptées aux contraintes du produit.')}
+        image="/images/eric-sitbon-usine.webp"
+      />
+      <section className="section timeline-section">
+        {aboutTimeline.map((item) => (
+          <article key={item.label} className="timeline-row reveal">
+            <span>{item.label}</span>
+            <p>{item.value}</p>
+          </article>
+        ))}
+      </section>
+      <FinalCta navigate={navigate} />
+    </>
+  );
+};
+
+const ContactPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { contactItems, markets } = useLocalizedContent();
+
+  return (
+    <section className="contact-page">
+      <div className="contact-copy reveal">
+        <p className="section-label">{t('Contact')}</p>
+        <h1>{t('Parlons de votre intégration.')}</h1>
+        <p>{t('Décrivez le produit, le geste attendu, le support textile et le niveau de contrainte. Nous vous orienterons vers la bonne architecture.')}</p>
+        <div className="contact-list">
+          {contactItems.map(({ icon: Icon, label }) => (
+            <div key={label}>
+              <Icon size={18} /> {label}
+            </div>
+          ))}
+        </div>
+      </div>
+      <form className="contact-form reveal" onSubmit={(event) => event.preventDefault()}>
+        <label>
+          {t('Nom et entreprise')}
+          <input placeholder={t('Votre nom, société')} />
+        </label>
+        <label>
+          {t('Email')}
+          <input type="email" placeholder={t('nom@entreprise.com')} />
+        </label>
+        <label>
+          {t('Marché concerné')}
+          <select defaultValue="">
+            <option value="" disabled>
+              {t('Sélectionner')}
+            </option>
+            {markets.map((market) => (
+              <option key={market.id}>{market.title}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t('Description du projet')}
+          <textarea placeholder={t('Usage, support textile, contrainte, volume, calendrier...')} />
+        </label>
+        <button className="primary-action large" type="submit">
+          {t('Envoyer la demande')} <ArrowRight size={18} />
+        </button>
+        <SmartLink to="/echantillon" navigate={navigate} className="text-link">
+          {t('Demander plutôt un échantillon')} <ArrowRight size={16} />
         </SmartLink>
-      }
-    />
-    <section className="section process-deep">
-      {PROCESS_STEPS.map((step) => (
-        <article key={step.id} className="process-deep-row reveal">
-          <span>{String(step.id).padStart(2, '0')}</span>
-          <img src={step.image} alt="" />
-          <div>
-            <h2>{step.title}</h2>
-            <p>{step.description}</p>
-          </div>
-        </article>
-      ))}
+      </form>
     </section>
-    <FinalCta navigate={navigate} />
-  </>
-);
+  );
+};
 
-const AboutPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <>
-    <PageIntro
-      label="Entreprise"
-      title="Une technologie magnétique textile née et développée à Paris."
-      copy="Depuis 2000, SYSTEMMAG développe des systèmes brevetés pour rendre les fermetures plus discrètes, plus rapides et plus adaptées aux contraintes du produit."
-      image="/images/eric-sitbon-usine.webp"
-    />
-    <section className="section timeline-section">
-      {ABOUT_TIMELINE.map((item) => (
-        <article key={item.label} className="timeline-row reveal">
-          <span>{item.label}</span>
-          <p>{item.value}</p>
-        </article>
-      ))}
-    </section>
-    <FinalCta navigate={navigate} />
-  </>
-);
+const SamplePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { productDecisionPaths } = useLocalizedContent();
 
-const ContactPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <section className="contact-page">
-    <div className="contact-copy reveal">
-      <p className="section-label">Contact</p>
-      <h1>Parlons de votre intégration.</h1>
-      <p>Décrivez le produit, le geste attendu, le support textile et le niveau de contrainte. Nous vous orienterons vers la bonne architecture.</p>
-      <div className="contact-list">
-        {CONTACT_ITEMS.map(({ icon: Icon, label }) => (
-          <div key={label}>
-            <Icon size={18} /> {label}
-          </div>
+  return (
+    <>
+      <PageIntro
+        label={t('Échantillon')}
+        title={t('Préparer un premier essai technique.')}
+        copy={t('Une demande d’échantillon est utile lorsque le support, le geste et l’effort attendu sont déjà identifiés.')}
+        image="/images/prototype-cta.png"
+        actions={
+          <SmartLink to="/contact" navigate={navigate} className="primary-action">
+            {t('Envoyer une demande')} <ArrowRight size={17} />
+          </SmartLink>
+        }
+      />
+      <section className="section decision-grid">
+        {productDecisionPaths.map((path) => (
+          <article className="decision-card reveal" key={path.title}>
+            <h3>{path.title}</h3>
+            <p>{path.text}</p>
+            <strong>{path.target}</strong>
+          </article>
+        ))}
+      </section>
+    </>
+  );
+};
+
+const BlogPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { blogPosts } = useLocalizedContent();
+
+  return (
+    <>
+      <PageIntro
+        label={t('Ressources')}
+        title={t('Guides techniques pour cadrer une fermeture magnétique.')}
+        copy={t('Articles, méthodes et repères pour discuter avec vos équipes design, R&D, achat ou production.')}
+        image="/images/technology-hero-ai-workbench.png"
+      />
+      <section className="section blog-index">
+        {blogPosts.map((post) => (
+          <SmartLink key={post.slug} to={`/blog/${post.slug}`} navigate={navigate} className="blog-card reveal">
+            <img src={post.coverImage} alt="" />
+            <div>
+              <span>{post.category}</span>
+              <h2>{post.title}</h2>
+              <p>{post.excerpt}</p>
+            </div>
+            <ArrowUpRight size={20} />
+          </SmartLink>
+        ))}
+      </section>
+    </>
+  );
+};
+
+const ArticlePage: React.FC<{ slug: string; navigate: NavigateFn }> = ({ slug, navigate }) => {
+  const t = useText();
+  const { blogPosts } = useLocalizedContent();
+  const post = resolveArticleFrom(blogPosts, slug);
+
+  return (
+    <article className="article-page">
+      <SmartLink to="/blog" navigate={navigate} className="back-link reveal">
+        <ChevronLeft size={16} /> {t('Ressources')}
+      </SmartLink>
+      <header className="article-header reveal">
+        <span>{post.category}</span>
+        <h1>{post.title}</h1>
+        <p>{post.excerpt}</p>
+        <small>
+          {post.author} · {post.publishDate}
+        </small>
+      </header>
+      <img className="article-cover reveal" src={post.coverImage} alt="" />
+      <div className="article-body">
+        {post.body.map((block) => (
+          <section key={block.title} className="reveal">
+            <h2>{block.title}</h2>
+            <p>{block.text}</p>
+          </section>
         ))}
       </div>
-    </div>
-    <form className="contact-form reveal" onSubmit={(event) => event.preventDefault()}>
-      <label>
-        Nom et entreprise
-        <input placeholder="Votre nom, société" />
-      </label>
-      <label>
-        Email
-        <input type="email" placeholder="nom@entreprise.com" />
-      </label>
-      <label>
-        Marché concerné
-        <select defaultValue="">
-          <option value="" disabled>
-            Sélectionner
-          </option>
-          {MARKETS.map((market) => (
-            <option key={market.id}>{market.title}</option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Description du projet
-        <textarea placeholder="Usage, support textile, contrainte, volume, calendrier..." />
-      </label>
-      <button className="primary-action large" type="submit">
-        Envoyer la demande <ArrowRight size={18} />
-      </button>
-      <SmartLink to="/echantillon" navigate={navigate} className="text-link">
-        Demander plutôt un échantillon <ArrowRight size={16} />
+    </article>
+  );
+};
+
+const PressPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { pressItems } = useLocalizedContent();
+
+  return (
+    <>
+      <PageIntro
+        label={t('Presse')}
+        title={t('SYSTEMMAG dans les médias.')}
+        copy={t('Quelques apparitions et mentions publiques autour de la technologie et de ses usages.')}
+        image="/images/cta-systemmag-orange.png"
+      />
+      <section className="section press-list">
+        {pressItems.map((item) => (
+          <article key={`${item.media}-${item.date}`} className="press-row reveal">
+            <strong>{item.media}</strong>
+            <span>{item.format}</span>
+            <p>{item.date}</p>
+          </article>
+        ))}
+      </section>
+      <FinalCta navigate={navigate} />
+    </>
+  );
+};
+
+const LegalPage: React.FC<{ slug: string; navigate: NavigateFn }> = ({ slug, navigate }) => {
+  const t = useText();
+  const { legalPages } = useLocalizedContent();
+  const page = resolveLegalPageFrom(legalPages, slug);
+
+  return (
+    <article className="legal-page">
+      <SmartLink to="/" navigate={navigate} className="back-link reveal">
+        <ChevronLeft size={16} /> {t('Accueil')}
       </SmartLink>
-    </form>
-  </section>
-);
-
-const SamplePage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <>
-    <PageIntro
-      label="Échantillon"
-      title="Préparer un premier essai technique."
-      copy="Une demande d’échantillon est utile lorsque le support, le geste et l’effort attendu sont déjà identifiés."
-      image="/images/prototype-cta.png"
-      actions={
-        <SmartLink to="/contact" navigate={navigate} className="primary-action">
-          Envoyer une demande <ArrowRight size={17} />
-        </SmartLink>
-      }
-    />
-    <section className="section decision-grid">
-      {PRODUCT_DECISION_PATHS.map((path) => (
-        <article className="decision-card reveal" key={path.title}>
-          <h3>{path.title}</h3>
-          <p>{path.text}</p>
-          <strong>{path.target}</strong>
-        </article>
-      ))}
-    </section>
-  </>
-);
-
-const BlogPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <>
-    <PageIntro
-      label="Ressources"
-      title="Guides techniques pour cadrer une fermeture magnétique."
-      copy="Articles, méthodes et repères pour discuter avec vos équipes design, R&D, achat ou production."
-      image="/images/technology-hero-ai-workbench.png"
-    />
-    <section className="section blog-index">
-      {BLOG_POSTS.map((post) => (
-        <SmartLink key={post.slug} to={`/blog/${post.slug}`} navigate={navigate} className="blog-card reveal">
-          <img src={post.coverImage} alt="" />
-          <div>
-            <span>{post.category}</span>
-            <h2>{post.title}</h2>
-            <p>{post.excerpt}</p>
-          </div>
-          <ArrowUpRight size={20} />
-        </SmartLink>
-      ))}
-    </section>
-  </>
-);
-
-const ArticlePage: React.FC<{ post: BlogPost; navigate: NavigateFn }> = ({ post, navigate }) => (
-  <article className="article-page">
-    <SmartLink to="/blog" navigate={navigate} className="back-link reveal">
-      <ChevronLeft size={16} /> Ressources
-    </SmartLink>
-    <header className="article-header reveal">
-      <span>{post.category}</span>
-      <h1>{post.title}</h1>
-      <p>{post.excerpt}</p>
-      <small>
-        {post.author} · {post.publishDate}
-      </small>
-    </header>
-    <img className="article-cover reveal" src={post.coverImage} alt="" />
-    <div className="article-body">
-      {post.body.map((block) => (
-        <section key={block.title} className="reveal">
-          <h2>{block.title}</h2>
-          <p>{block.text}</p>
-        </section>
-      ))}
-    </div>
-  </article>
-);
-
-const PressPage: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <>
-    <PageIntro
-      label="Presse"
-      title="SYSTEMMAG dans les médias."
-      copy="Quelques apparitions et mentions publiques autour de la technologie et de ses usages."
-      image="/images/cta-systemmag-orange.png"
-    />
-    <section className="section press-list">
-      {PRESS_ITEMS.map((item) => (
-        <article key={`${item.media}-${item.date}`} className="press-row reveal">
-          <strong>{item.media}</strong>
-          <span>{item.format}</span>
-          <p>{item.date}</p>
-        </article>
-      ))}
-    </section>
-    <FinalCta navigate={navigate} />
-  </>
-);
-
-const LegalPage: React.FC<{ page: LegalPage; navigate: NavigateFn }> = ({ page, navigate }) => (
-  <article className="legal-page">
-    <SmartLink to="/" navigate={navigate} className="back-link reveal">
-      <ChevronLeft size={16} /> Accueil
-    </SmartLink>
-    <header className="article-header reveal">
-      <h1>{page.title}</h1>
-      <p>{page.intro}</p>
-    </header>
-    <div className="article-body">
-      {page.sections.map((section) => (
-        <section key={section.title} className="reveal">
-          <h2>{section.title}</h2>
-          <p>{section.text}</p>
-        </section>
-      ))}
-    </div>
-  </article>
-);
+      <header className="article-header reveal">
+        <h1>{page.title}</h1>
+        <p>{page.intro}</p>
+      </header>
+      <div className="article-body">
+        {page.sections.map((section) => (
+          <section key={section.title} className="reveal">
+            <h2>{section.title}</h2>
+            <p>{section.text}</p>
+          </section>
+        ))}
+      </div>
+    </article>
+  );
+};
 
 const FaqSection: React.FC<{ faq: Array<{ question: string; answer: string }> }> = ({ faq }) => {
+  const t = useText();
   if (!faq.length) return null;
   return (
     <section className="section faq-section">
       <div className="section-head reveal">
         <div>
           <p className="section-label">FAQ</p>
-          <h2>Questions fréquentes.</h2>
+          <h2>{t('Questions fréquentes.')}</h2>
         </div>
       </div>
       <div className="faq-list">
@@ -1668,53 +1880,58 @@ const FaqSection: React.FC<{ faq: Array<{ question: string; answer: string }> }>
   );
 };
 
-const Footer: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => (
-  <footer className="site-footer">
-    <div className="footer-brand">
-      <img src="/images/logo-systemmag.png" alt="SYSTEMMAG" />
-      <p>Fermetures magnétiques intégrées aux textiles, accessoires et équipements techniques.</p>
-    </div>
-    <div className="footer-grid">
-      <div>
-        <h3>Produits</h3>
-        {PRODUCTS.map((product) => (
-          <SmartLink key={product.id} to={productPath(product)} navigate={navigate}>
-            {product.title}
-          </SmartLink>
-        ))}
+const Footer: React.FC<{ navigate: NavigateFn }> = ({ navigate }) => {
+  const t = useText();
+  const { products, markets, contactItems } = useLocalizedContent();
+
+  return (
+    <footer className="site-footer">
+      <div className="footer-brand">
+        <img src="/images/logo-systemmag.png" alt="SYSTEMMAG" />
+        <p>{t('Fermetures magnétiques intégrées aux textiles, accessoires et équipements techniques.')}</p>
       </div>
-      <div>
-        <h3>Marchés</h3>
-        {MARKETS.slice(0, 6).map((market) => (
-          <SmartLink key={market.id} to={marketPath(market)} navigate={navigate}>
-            {market.title}
-          </SmartLink>
-        ))}
+      <div className="footer-grid">
+        <div>
+          <h3>{t('Produits')}</h3>
+          {products.map((product) => (
+            <SmartLink key={product.id} to={productPath(product)} navigate={navigate}>
+              {product.title}
+            </SmartLink>
+          ))}
+        </div>
+        <div>
+          <h3>{t('Marchés')}</h3>
+          {markets.slice(0, 6).map((market) => (
+            <SmartLink key={market.id} to={marketPath(market)} navigate={navigate}>
+              {market.title}
+            </SmartLink>
+          ))}
+        </div>
+        <div>
+          <h3>{t('Ressources')}</h3>
+          <SmartLink to="/technology" navigate={navigate}>{t('Technologie')}</SmartLink>
+          <SmartLink to="/integration" navigate={navigate}>{t('Savoir-faire')}</SmartLink>
+          <SmartLink to="/blog" navigate={navigate}>Blog</SmartLink>
+          <SmartLink to="/about" navigate={navigate}>{t('Entreprise')}</SmartLink>
+          <SmartLink to="/press" navigate={navigate}>{t('Presse')}</SmartLink>
+          <a href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
+            {t('Catalogue technique')}
+          </a>
+        </div>
+        <div>
+          <h3>{t('Contact')}</h3>
+          {contactItems.map(({ label }) => (
+            <span key={label}>{label}</span>
+          ))}
+        </div>
       </div>
-      <div>
-        <h3>Ressources</h3>
-        <SmartLink to="/technology" navigate={navigate}>Technologie</SmartLink>
-        <SmartLink to="/integration" navigate={navigate}>Savoir-faire</SmartLink>
-        <SmartLink to="/blog" navigate={navigate}>Blog</SmartLink>
-        <SmartLink to="/about" navigate={navigate}>Entreprise</SmartLink>
-        <SmartLink to="/press" navigate={navigate}>Presse</SmartLink>
-        <a href="/downloads/catalogue-systemmag-fr.pdf" target="_blank" rel="noreferrer">
-          Catalogue technique
-        </a>
+      <div className="footer-bottom">
+        <span>© 2026 SYSTEMMAG</span>
+        <SmartLink to="/legal" navigate={navigate}>{t('Mentions légales')}</SmartLink>
+        <SmartLink to="/privacy" navigate={navigate}>{t('Confidentialité')}</SmartLink>
       </div>
-      <div>
-        <h3>Contact</h3>
-        {CONTACT_ITEMS.map(({ label }) => (
-          <span key={label}>{label}</span>
-        ))}
-      </div>
-    </div>
-    <div className="footer-bottom">
-      <span>© 2026 SYSTEMMAG</span>
-      <SmartLink to="/legal" navigate={navigate}>Mentions légales</SmartLink>
-      <SmartLink to="/privacy" navigate={navigate}>Confidentialité</SmartLink>
-    </div>
-  </footer>
-);
+    </footer>
+  );
+};
 
 export default App;
