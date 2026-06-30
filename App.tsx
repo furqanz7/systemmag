@@ -713,6 +713,9 @@ const ProductsMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ n
       <div>
         <p className="mega-title">{t('Familles de produits')}</p>
         <p className="mega-copy">{t('Choisir une fermeture, un module ou une intégration selon le geste attendu.')}</p>
+        <figure className="mega-visual" aria-hidden="true">
+          <img src="/images/zip-c-isolated.png" alt="" />
+        </figure>
       </div>
       <div className="mega-list">
         {products.map((product) => (
@@ -736,6 +739,9 @@ const MarketsMega: React.FC<{ navigate: NavigateFn; close: () => void }> = ({ na
       <div>
         <p className="mega-title">{t('Applications')}</p>
         <p className="mega-copy">{t('Des usages où le geste, la discrétion et la fiabilité comptent.')}</p>
+        <figure className="mega-visual" aria-hidden="true">
+          <img src="/images/markets-hero-collage.png" alt="" />
+        </figure>
       </div>
       <div className="mega-list mega-list-two">
         {markets.map((market) => (
